@@ -40,7 +40,7 @@ export interface DatabaseSchema {
   promptCategories: string[];
 }
 
-const DATA_DIR = path.join(process.cwd(), 'data');
+const DATA_DIR = process.env.VERCEL === '1' ? '/tmp' : path.join(process.cwd(), 'data');
 const DB_FILE = path.join(DATA_DIR, 'database.json');
 
 const INITIAL_CATEGORIES = [
@@ -785,6 +785,15 @@ export class Database {
   private constructor() {
     if (!fs.existsSync(DATA_DIR)) {
       fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+
+    const initialSourceFile = path.join(process.cwd(), 'data', 'database.json');
+    if (!fs.existsSync(DB_FILE) && fs.existsSync(initialSourceFile)) {
+      try {
+        fs.copyFileSync(initialSourceFile, DB_FILE);
+      } catch (copyErr) {
+        console.warn('Could not copy initial database to DB_FILE:', copyErr);
+      }
     }
 
     if (fs.existsSync(DB_FILE)) {

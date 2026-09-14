@@ -1,4 +1,6 @@
-const API_BASE = '/api';
+const env = (import.meta as any).env || {};
+const RAW_API_BASE = (env.VITE_API_BASE || env.VITE_API_URL || '/api').replace(/\/$/, '');
+const API_BASE = RAW_API_BASE.endsWith('/api') ? RAW_API_BASE : `${RAW_API_BASE}/api`;
 
 export function getStoredUserId(): string | null {
   return localStorage.getItem('pesquisa_jogos_user_id');

@@ -22,10 +22,29 @@ import {
   SystemVersion,
 } from './src/types.js';
 
-const app = express();
+export const app = express();
 const PORT = 3000;
 
 app.use(express.json());
+
+// Enable CORS for API routes
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-user-id');
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
+// Normalize route so requests missing /api prefix (e.g., from certain proxies or serverless rewrites) match /api/* routes
+app.use((req, res, next) => {
+  if (req.url && !req.url.startsWith('/api') && !req.url.startsWith('/assets') && req.url !== '/' && !req.url.includes('.')) {
+    req.url = `/api${req.url.startsWith('/') ? req.url : `/${req.url}`}`;
+  }
+  next();
+});
 
 // Request logger for debugging & trace
 app.use((req, res, next) => {
@@ -2529,4 +2548,15 @@ async function startServer() {
   });
 }
 
-startServer();
+// Only start standalone HTTP server if executed directly and not in a serverless environment (like Vercel)
+const isDirectRun = process.argv[1] && (
+  process.argv[1].endsWith('server.ts') ||
+  process.argv[1].endsWith('server.cjs') ||
+  process.argv[1].endsWith('server.js')
+);
+
+if (isDirectRun && process.env.VERCEL !== '1' && !process.env.AWS_LAMBDA_FUNCTION_NAME) {
+  startServer();
+}
+
+export default app;
