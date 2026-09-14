@@ -1,0 +1,88 @@
+import { Request, Response, NextFunction } from 'express';
+import { db } from './db.js';
+import { UserRole, Participant } from '../src/types.js';
+
+export interface AuthenticatedRequest extends Request {
+  user?: {
+    id: string;
+    nome: string;
+    email: string;
+    role: UserRole;
+    equipeId?: string;
+  };
+}
+
+export function authMiddleware(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+  let userId = req.headers['x-user-id'] as string;
+  const data = db.getData();
+
+  // Public/Setup routes that bypass user verification
+  const publicPaths = [
+    '/api/auth/status',
+    '/api/auth/current',
+    '/api/auth/users',
+    '/api/auth/register',
+    '/api/auth/login',
+    '/api/auth/logout',
+    '/api/setup/initial-user',
+    '/api/setup/seed',
+  ];
+
+  if (publicPaths.includes(req.path)) {
+    return next();
+  }
+
+  if (!userId) {
+    return res.status(401).json({ error: 'Autenticação necessária. Faça login para acessar o sistema NexoIF.' });
+  }
+
+  const participant = data.participants.find(p => p.id === userId);
+  if (!participant) {
+    return res.status(401).json({ error: 'Sessão inválida ou expirada. Faça login novamente no NexoIF.' });
+  }
+
+  if (participant.status === 'Inativo') {
+    return res.status(403).json({ error: 'Este participante está desativado no projeto.' });
+  }
+
+  req.user = {
+    id: participant.id,
+    nome: participant.nome,
+    email: participant.email,
+    role: participant.funcao,
+    equipeId: participant.equipeId,
+  };
+
+  next();
+}
+
+export function requireRoles(...allowedRoles: UserRole[]) {
+  return (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Autenticação necessária.' });
+    }
+
+    if (!allowedRoles.includes(req.user.role)) {
+      return res.status(403).json({
+        error: `Acesso negado: Perfil '${getRoleLabel(req.user.role)}' não possui permissão para esta ação.`,
+      });
+    }
+
+    next();
+  };
+}
+
+export function getRoleLabel(role: UserRole): string {
+  switch (role) {
+    case 'coordenador_aluno':
+      return 'Coordenador Aluno';
+    case 'professor_orientador':
+      return 'Professor Orientador';
+    case 'professor_colaborador':
+      return 'Professor Colaborador';
+    case 'aluno':
+      return 'Aluno';
+    default:
+      return role;
+  }
+}

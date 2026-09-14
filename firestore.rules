@@ -1,0 +1,186 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'paulocauan39@gmail.com' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    // Participants validation
+    function isValidParticipant(data) {
+      return data.id is string && isValidId(data.id) &&
+        data.nome is string && data.nome.size() > 0 && data.nome.size() <= 200 &&
+        data.email is string && data.email.size() <= 200 &&
+        data.funcao in ['coordenador_aluno', 'professor_orientador', 'professor_colaborador', 'aluno'] &&
+        data.status in ['Ativo', 'Inativo'];
+    }
+
+    match /participants/{participantId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(participantId) && isValidParticipant(incoming());
+      allow update: if isSignedIn() && isValidId(participantId) && isValidParticipant(incoming());
+      allow delete: if isAdmin();
+    }
+
+    // Teams validation
+    function isValidTeam(data) {
+      return data.id is string && isValidId(data.id) &&
+        data.nome is string && data.nome.size() > 0 && data.nome.size() <= 200 &&
+        data.responsavelId is string && isValidId(data.responsavelId) &&
+        data.status in ['Ativa', 'Inativa'];
+    }
+
+    match /teams/{teamId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidId(teamId) && isValidTeam(incoming());
+      allow delete: if isAdmin();
+    }
+
+    // Games validation
+    function isValidGame(data) {
+      return data.id is string && isValidId(data.id) &&
+        data.nome is string && data.nome.size() > 0 && data.nome.size() <= 200 &&
+        data.equipeId is string && isValidId(data.equipeId) &&
+        data.status in ['Planejamento', 'Desenvolvimento', 'Testes', 'Finalizado', 'Arquivado'];
+    }
+
+    match /games/{gameId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidId(gameId) && isValidGame(incoming());
+      allow delete: if isAdmin();
+    }
+
+    // Tasks validation (with completion date check when Concluída)
+    function isValidTask(data) {
+      return data.id is string && isValidId(data.id) &&
+        data.titulo is string && data.titulo.size() > 0 && data.titulo.size() <= 200 &&
+        data.responsavelId is string && isValidId(data.responsavelId) &&
+        data.equipeId is string && isValidId(data.equipeId) &&
+        data.prioridade in ['Baixa', 'Média', 'Alta', 'Crítica'] &&
+        data.status in ['A fazer', 'Em andamento', 'Em revisão', 'Concluída', 'Cancelada'] &&
+        data.prazo is string && data.prazo.size() > 0 &&
+        (data.status != 'Concluída' || (data.dataConclusao is string && data.dataConclusao.size() > 0));
+    }
+
+    match /tasks/{taskId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidId(taskId) && isValidTask(incoming());
+      allow delete: if isSignedIn();
+    }
+
+    // AIs validation
+    function isValidAI(data) {
+      return data.id is string && isValidId(data.id) &&
+        data.nome is string && data.nome.size() > 0 && data.nome.size() <= 200 &&
+        data.empresaProvedor is string && data.empresaProvedor.size() <= 200 &&
+        data.modelo is string && data.modelo.size() <= 100;
+    }
+
+    match /ais/{aiId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidId(aiId) && isValidAI(incoming());
+      allow delete: if isAdmin();
+    }
+
+    // Experiments validation
+    function isValidExperiment(data) {
+      return data.id is string && isValidId(data.id) &&
+        data.jogoId is string && isValidId(data.jogoId) &&
+        data.alunoResponsavelId is string && isValidId(data.alunoResponsavelId) &&
+        data.iaId is string && isValidId(data.iaId) &&
+        data.prompt is string && data.prompt.size() > 0 &&
+        data.resultadoObtido is string && data.resultadoObtido.size() > 0;
+    }
+
+    match /experiments/{experimentId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidId(experimentId) && isValidExperiment(incoming());
+      allow delete: if isSignedIn();
+    }
+
+    // Prompts validation
+    function isValidPrompt(data) {
+      return data.id is string && isValidId(data.id) &&
+        data.titulo is string && data.titulo.size() > 0 && data.titulo.size() <= 200 &&
+        data.autorId is string && isValidId(data.autorId) &&
+        data.promptCompleto is string && data.promptCompleto.size() > 0;
+    }
+
+    match /prompts/{promptId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidId(promptId) && isValidPrompt(incoming());
+      allow delete: if isSignedIn();
+    }
+
+    // Prompt Categories (Administrative Module)
+    function isValidPromptCategory(data) {
+      return data.id is string && isValidId(data.id) &&
+        data.nome is string && data.nome.size() > 0 && data.nome.size() <= 100 &&
+        data.ativa is bool;
+    }
+
+    match /promptCategories/{categoryId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isSignedIn() && isValidId(categoryId) && isValidPromptCategory(incoming());
+    }
+
+    // Project Documents (Documentation Module)
+    function isValidDocument(data) {
+      return data.id is string && isValidId(data.id) &&
+        data.titulo is string && data.titulo.size() > 0 && data.titulo.size() <= 200 &&
+        data.categoria in ['Especificação Técnica', 'Relatório de Progresso', 'Manual', 'Artigo Científico', 'Ata de Reunião', 'Outro'] &&
+        data.descricao is string && data.descricao.size() <= 1000 &&
+        data.conteudo is string && data.conteudo.size() > 0 &&
+        data.autorId is string && isValidId(data.autorId) &&
+        data.nivelAcesso in ['Todos', 'Apenas Professores e Coordenador', 'Restrito'];
+    }
+
+    match /documents/{documentId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidId(documentId) && isValidDocument(incoming());
+      allow delete: if isSignedIn();
+    }
+
+    // Audit Logs (Global Logger)
+    function isValidAudit(data) {
+      return data.id is string && isValidId(data.id) &&
+        data.usuarioId is string && isValidId(data.usuarioId) &&
+        data.acao is string && data.acao.size() <= 100 &&
+        data.registroAfetado is string && data.registroAfetado.size() <= 200 &&
+        data.tipoEntidade is string && data.tipoEntidade.size() <= 100 &&
+        data.entidadeId is string && isValidId(data.entidadeId) &&
+        data.timestamp is number;
+    }
+
+    match /auditLogs/{logId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(logId) && isValidAudit(incoming());
+      allow update, delete: if false; // Immutable audit trail
+    }
+  }
+}

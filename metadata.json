@@ -1,0 +1,6 @@
+{
+  "name": "NexoIF",
+  "description": "NexoIF - Sistema Integrado de Gestão, Acompanhamento e Pesquisa Acadêmica em Desenvolvimento de Jogos com Inteligência Artificial.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

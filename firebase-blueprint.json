@@ -1,0 +1,244 @@
+{
+  "entities": {
+    "Participant": {
+      "title": "Participant",
+      "description": "Participante acadêmico (estudante, coordenador ou professor orientador)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "nome": { "type": "string", "maxLength": 200 },
+        "email": { "type": "string", "format": "email", "maxLength": 200 },
+        "funcao": { "type": "string", "enum": ["coordenador_aluno", "professor_orientador", "professor_colaborador", "aluno"] },
+        "equipeId": { "type": "string", "maxLength": 128 },
+        "equipeNome": { "type": "string", "maxLength": 200 },
+        "status": { "type": "string", "enum": ["Ativo", "Inativo"] },
+        "dataEntrada": { "type": "string", "maxLength": 30 },
+        "createdAt": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id", "nome", "email", "funcao", "status"]
+    },
+    "Team": {
+      "title": "Team",
+      "description": "Equipe de desenvolvimento e pesquisa de jogos",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "nome": { "type": "string", "maxLength": 200 },
+        "descricao": { "type": "string", "maxLength": 1000 },
+        "responsavelId": { "type": "string", "maxLength": 128 },
+        "responsavelNome": { "type": "string", "maxLength": 200 },
+        "participantesIds": { "type": "array" },
+        "areaAtuacao": { "type": "string", "maxLength": 200 },
+        "status": { "type": "string", "enum": ["Ativa", "Inativa"] },
+        "createdAt": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id", "nome", "responsavelId", "status"]
+    },
+    "Game": {
+      "title": "Game",
+      "description": "Jogo acadêmico em pesquisa e desenvolvimento com IA",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "nome": { "type": "string", "maxLength": 200 },
+        "descricao": { "type": "string", "maxLength": 2000 },
+        "objetivo": { "type": "string", "maxLength": 1000 },
+        "equipeId": { "type": "string", "maxLength": 128 },
+        "equipeNome": { "type": "string", "maxLength": 200 },
+        "participantesIds": { "type": "array" },
+        "tecnologiaUtilizada": { "type": "string", "maxLength": 200 },
+        "versaoAtual": { "type": "string", "maxLength": 50 },
+        "status": { "type": "string", "enum": ["Planejamento", "Desenvolvimento", "Testes", "Finalizado", "Arquivado"] },
+        "dataInicio": { "type": "string", "maxLength": 30 },
+        "previsaoConclusao": { "type": "string", "maxLength": 30 },
+        "linkProjeto": { "type": "string", "maxLength": 500 },
+        "observacoes": { "type": "string", "maxLength": 2000 },
+        "createdAt": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id", "nome", "equipeId", "status"]
+    },
+    "Task": {
+      "title": "Task",
+      "description": "Tarefa acadêmica com controle de prazos e transição de status",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "titulo": { "type": "string", "maxLength": 200 },
+        "descricao": { "type": "string", "maxLength": 2000 },
+        "responsavelId": { "type": "string", "maxLength": 128 },
+        "responsavelNome": { "type": "string", "maxLength": 200 },
+        "equipeId": { "type": "string", "maxLength": 128 },
+        "equipeNome": { "type": "string", "maxLength": 200 },
+        "jogoId": { "type": "string", "maxLength": 128 },
+        "jogoNome": { "type": "string", "maxLength": 200 },
+        "prioridade": { "type": "string", "enum": ["Baixa", "Média", "Alta", "Crítica"] },
+        "status": { "type": "string", "enum": ["A fazer", "Em andamento", "Em revisão", "Concluída", "Cancelada"] },
+        "prazo": { "type": "string", "maxLength": 30 },
+        "dataConclusao": { "type": "string", "maxLength": 30 },
+        "observacoes": { "type": "string", "maxLength": 2000 },
+        "createdAt": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id", "titulo", "responsavelId", "equipeId", "prioridade", "status", "prazo"]
+    },
+    "AIModel": {
+      "title": "AIModel",
+      "description": "Modelo ou ferramenta de inteligência artificial catalogada na pesquisa",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "nome": { "type": "string", "maxLength": 200 },
+        "empresaProvedor": { "type": "string", "maxLength": 200 },
+        "modelo": { "type": "string", "maxLength": 100 },
+        "versao": { "type": "string", "maxLength": 50 },
+        "tipo": { "type": "string", "maxLength": 50 },
+        "finalidade": { "type": "string", "maxLength": 1000 },
+        "observacoes": { "type": "string", "maxLength": 2000 },
+        "linkOficial": { "type": "string", "maxLength": 500 },
+        "createdAt": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id", "nome", "empresaProvedor", "modelo", "finalidade"]
+    },
+    "Experiment": {
+      "title": "Experiment",
+      "description": "Registro de experimento com IA no desenvolvimento de jogos",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "jogoId": { "type": "string", "maxLength": 128 },
+        "alunoResponsavelId": { "type": "string", "maxLength": 128 },
+        "alunoResponsavelNome": { "type": "string", "maxLength": 200 },
+        "iaId": { "type": "string", "maxLength": 128 },
+        "iaNome": { "type": "string", "maxLength": 200 },
+        "modelo": { "type": "string", "maxLength": 100 },
+        "data": { "type": "string", "maxLength": 30 },
+        "finalidade": { "type": "string", "maxLength": 1000 },
+        "tarefaRealizada": { "type": "string", "maxLength": 1000 },
+        "prompt": { "type": "string", "maxLength": 5000 },
+        "resultadoObtido": { "type": "string", "maxLength": 5000 },
+        "alteracoesManuais": { "type": "string", "maxLength": 2000 },
+        "problemasEncontrados": { "type": "string", "maxLength": 2000 },
+        "tempoAproximadoMinutos": { "type": "number" },
+        "avaliacao": { "type": "number" },
+        "resultadoFinal": { "type": "string", "maxLength": 100 },
+        "createdAt": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id", "jogoId", "alunoResponsavelId", "iaId", "prompt", "resultadoObtido"]
+    },
+    "PromptItem": {
+      "title": "PromptItem",
+      "description": "Biblioteca e catalogação de prompts de engenharia de IA para jogos",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "titulo": { "type": "string", "maxLength": 200 },
+        "autorId": { "type": "string", "maxLength": 128 },
+        "autorNome": { "type": "string", "maxLength": 200 },
+        "iaId": { "type": "string", "maxLength": 128 },
+        "categoria": { "type": "string", "maxLength": 100 },
+        "promptCompleto": { "type": "string", "maxLength": 5000 },
+        "resultadoEsperado": { "type": "string", "maxLength": 2000 },
+        "avaliacao": { "type": "number" },
+        "createdAt": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id", "titulo", "autorId", "categoria", "promptCompleto"]
+    },
+    "PromptCategoryItem": {
+      "title": "PromptCategoryItem",
+      "description": "Categoria administrativa de prompt gerenciada pelo Coordenador Aluno",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "nome": { "type": "string", "maxLength": 100 },
+        "descricao": { "type": "string", "maxLength": 500 },
+        "ativa": { "type": "boolean" },
+        "createdAt": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id", "nome", "ativa"]
+    },
+    "ProjectDocument": {
+      "title": "ProjectDocument",
+      "description": "Documento acadêmico do projeto (especificações, relatórios, manuais)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "titulo": { "type": "string", "maxLength": 200 },
+        "categoria": { "type": "string", "enum": ["Especificação Técnica", "Relatório de Progresso", "Manual", "Artigo Científico", "Ata de Reunião", "Outro"] },
+        "descricao": { "type": "string", "maxLength": 1000 },
+        "conteudo": { "type": "string", "maxLength": 20000 },
+        "jogoId": { "type": "string", "maxLength": 128 },
+        "autorId": { "type": "string", "maxLength": 128 },
+        "autorNome": { "type": "string", "maxLength": 200 },
+        "autorRole": { "type": "string", "maxLength": 50 },
+        "versao": { "type": "string", "maxLength": 50 },
+        "nivelAcesso": { "type": "string", "enum": ["Todos", "Apenas Professores e Coordenador", "Restrito"] },
+        "linkExterno": { "type": "string", "maxLength": 500 },
+        "dataCriacao": { "type": "string", "maxLength": 30 },
+        "createdAt": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id", "titulo", "categoria", "descricao", "conteudo", "autorId", "nivelAcesso"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Registro de auditoria global das alterações do projeto",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "usuarioId": { "type": "string", "maxLength": 128 },
+        "usuarioNome": { "type": "string", "maxLength": 200 },
+        "usuarioRole": { "type": "string", "maxLength": 50 },
+        "acao": { "type": "string", "maxLength": 100 },
+        "registroAfetado": { "type": "string", "maxLength": 200 },
+        "tipoEntidade": { "type": "string", "maxLength": 100 },
+        "entidadeId": { "type": "string", "maxLength": 128 },
+        "moduloAfetado": { "type": "string", "maxLength": 100 },
+        "data": { "type": "string", "maxLength": 30 },
+        "horario": { "type": "string", "maxLength": 30 },
+        "alteracaoRealizada": { "type": "string", "maxLength": 2000 },
+        "timestamp": { "type": "number" }
+      },
+      "required": ["id", "usuarioId", "acao", "registroAfetado", "tipoEntidade", "entidadeId", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/participants/{participantId}": {
+      "schema": "Participant",
+      "description": "Participantes do projeto acadêmico"
+    },
+    "/teams/{teamId}": {
+      "schema": "Team",
+      "description": "Equipes de pesquisa de jogos"
+    },
+    "/games/{gameId}": {
+      "schema": "Game",
+      "description": "Jogos catalogados no projeto"
+    },
+    "/tasks/{taskId}": {
+      "schema": "Task",
+      "description": "Tarefas do cronograma acadêmico"
+    },
+    "/ais/{aiId}": {
+      "schema": "AIModel",
+      "description": "Modelos de IA catalogados"
+    },
+    "/experiments/{experimentId}": {
+      "schema": "Experiment",
+      "description": "Experimentos de uso de IA em jogos"
+    },
+    "/prompts/{promptId}": {
+      "schema": "PromptItem",
+      "description": "Biblioteca de prompts"
+    },
+    "/promptCategories/{categoryId}": {
+      "schema": "PromptCategoryItem",
+      "description": "Categorias de prompts gerenciadas pelo Coordenador"
+    },
+    "/documents/{documentId}": {
+      "schema": "ProjectDocument",
+      "description": "Documentos e especificações do projeto"
+    },
+    "/auditLogs/{logId}": {
+      "schema": "AuditLog",
+      "description": "Logs de auditoria e histórico de atividades"
+    }
+  }
+}
