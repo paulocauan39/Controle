@@ -1,6 +1,5 @@
 import express, { Request, Response } from 'express';
 import path from 'path';
-import { createServer as createViteServer } from 'vite';
 import { db } from './server/db.js';
 import { authMiddleware, requireRoles, AuthenticatedRequest, getRoleLabel } from './server/auth.js';
 import {
@@ -2530,6 +2529,7 @@ app.get('/api/reports/:type', (req: AuthenticatedRequest, res: Response) => {
 
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
