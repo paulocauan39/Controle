@@ -49,10 +49,23 @@ service cloud.firestore {
 
     // Usuarios collection (Firebase Auth user profile mapping)
     match /usuarios/{usuarioId} {
-      allow read: if isSignedIn();
-      allow create, update: if isSignedIn() && (
-        usuarioId == request.auth.uid ||
-        (incoming().email is string && (incoming().email == request.auth.token.email || isAdmin())) ||
+      allow read: if isSignedIn() && (
+        request.auth.uid == usuarioId ||
+        isAdmin() ||
+        (resource != null && resource.data.email == request.auth.token.email) ||
+        (exists(/databases/$(database)/documents/participants/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/participants/$(request.auth.uid)).data.funcao in ['coordenador_aluno', 'professor_orientador']) ||
+        (exists(/databases/$(database)/documents/usuarios/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.funcao in ['coordenador_aluno', 'professor_orientador'])
+      );
+      allow create: if isSignedIn() && (
+        request.auth.uid == usuarioId ||
+        (incoming().email is string && incoming().email == request.auth.token.email) ||
+        isAdmin()
+      );
+      allow update: if isSignedIn() && (
+        request.auth.uid == usuarioId ||
+        (incoming().email is string && incoming().email == request.auth.token.email) ||
         isAdmin()
       );
       allow delete: if isAdmin();

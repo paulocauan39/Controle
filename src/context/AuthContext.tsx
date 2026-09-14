@@ -48,30 +48,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let isMounted = true;
 
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      console.log('[AuthFlow] 1. onAuthStateChanged triggered:', user ? { uid: user.uid, email: user.email, displayName: user.displayName } : null);
       setFirebaseUser(user);
 
       if (user && user.email) {
         setIsLoading(true);
         try {
           // 1. Fetch participant profile if any from Firestore
-          const firestoreParticipant = await getParticipantFromFirestore(user.email);
+          let firestoreParticipant: Participant | null = null;
+          try {
+            console.log('[AuthFlow] 2. Starting Firestore fetch for user profile...', { uid: user.uid, email: user.email });
+            firestoreParticipant = await getParticipantFromFirestore(user.uid, user.email);
+            console.log('[AuthFlow] 3. Result of Firestore fetch:', firestoreParticipant);
+          } catch (firestoreErr: any) {
+            console.error('[AuthFlow] 3. Error during Firestore fetch (handled without dropping session):', firestoreErr?.code || firestoreErr?.message || firestoreErr);
+          }
 
-          // 2. Synchronize with backend API
-          const res = await api.loginWithGoogle({
-            email: user.email,
-            displayName: user.displayName,
-            photoURL: user.photoURL,
-            uid: user.uid,
-          });
-
-          if (res.user && isMounted) {
+          if (isMounted) {
             const finalParticipant: Participant = {
-              ...res.user,
-              funcao: firestoreParticipant?.funcao || res.user.funcao,
-              status: firestoreParticipant?.status || res.user.status,
+              id: firestoreParticipant?.id || user.uid,
+              nome: firestoreParticipant?.nome || user.displayName || (user.email ? user.email.split('@')[0] : 'Usuário'),
+              email: user.email,
+              funcao: firestoreParticipant?.funcao || (user.email === 'paulocauan39@gmail.com' ? 'coordenador_aluno' : 'aluno'),
+              status: firestoreParticipant?.status || 'Ativo',
+              dataEntrada: firestoreParticipant?.dataEntrada || new Date().toISOString().split('T')[0],
+              createdAt: firestoreParticipant?.createdAt || new Date().toISOString(),
+              equipeId: firestoreParticipant?.equipeId,
+              equipeNome: firestoreParticipant?.equipeNome,
             };
 
             setStoredUserId(finalParticipant.id);
+            console.log('[AuthFlow] 4. Final setting of user state (currentUser):', finalParticipant);
             setCurrentUser(finalParticipant);
 
             // Update users list in background
@@ -80,16 +87,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 if (isMounted) setUsersList(allUsers);
               })
               .catch((e) => {
-                console.warn('Atualização da lista de usuários:', e);
+                console.warn('[AuthFlow] Atualização da lista de usuários:', e);
               });
 
             // 3. Persist in Firestore (non-blocking)
             syncParticipantToFirestore(finalParticipant, user.uid).catch((err) => {
-              console.warn('Falha silenciosa ao sincronizar Firestore:', err);
+              console.warn('[AuthFlow] Falha silenciosa ao sincronizar Firestore:', err);
             });
           }
         } catch (err) {
-          console.error('Erro ao sincronizar sessão autenticada:', err);
+          console.error('[AuthFlow] Erro ao sincronizar sessão autenticada:', err);
         } finally {
           if (isMounted) {
             setIsLoading(false);
@@ -97,6 +104,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       } else {
         // Firebase Auth reports no active Firebase user
+        console.log('[AuthFlow] No active Firebase Auth user. Fetching initial local status...');
         try {
           const status = await api.getAuthStatus();
           if (isMounted) setIsInitialized(status.initialized);
@@ -108,16 +116,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const savedId = getStoredUserId();
             const matched = savedId ? allUsers.find((u: Participant) => u.id === savedId) : null;
             if (isMounted) {
+              console.log('[AuthFlow] Setting state for local user session:', matched);
               setCurrentUser(matched || null);
             }
           } else {
             if (isMounted) {
+              console.log('[AuthFlow] System not initialized, clearing currentUser.');
               setCurrentUser(null);
               setUsersList([]);
             }
           }
         } catch (err) {
-          console.warn('Verificação de estado inicial:', err);
+          console.warn('[AuthFlow] Verificação de estado inicial:', err);
         } finally {
           if (isMounted) {
             setIsLoading(false);
@@ -160,37 +170,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signInWithGoogle = async (): Promise<Participant> => {
     setIsLoading(true);
     try {
+      console.log('[AuthFlow] signInWithGoogle initiated...');
       const fbUser = await firebaseGoogleLogin();
       if (!fbUser || !fbUser.email) {
         throw new Error('Não foi possível obter os dados da conta Google.');
       }
+      console.log('[AuthFlow] signInWithGoogle popup success:', { uid: fbUser.uid, email: fbUser.email });
 
       // Check Firestore document
-      const firestoreParticipant = await getParticipantFromFirestore(fbUser.email);
-
-      const res = await api.loginWithGoogle({
-        email: fbUser.email,
-        displayName: fbUser.displayName,
-        photoURL: fbUser.photoURL,
-        uid: fbUser.uid,
-      });
-
-      if (!res.user) {
-        throw new Error('Falha ao autenticar o usuário no sistema NexoIF.');
+      let firestoreParticipant: Participant | null = null;
+      try {
+        console.log('[AuthFlow] Starting Firestore fetch in signInWithGoogle...', { uid: fbUser.uid, email: fbUser.email });
+        firestoreParticipant = await getParticipantFromFirestore(fbUser.uid, fbUser.email);
+        console.log('[AuthFlow] Firestore fetch result in signInWithGoogle:', firestoreParticipant);
+      } catch (fErr: any) {
+        console.warn('[AuthFlow] Firestore fetch error in signInWithGoogle:', fErr?.code || fErr?.message || fErr);
       }
 
       const finalParticipant: Participant = {
-        ...res.user,
-        funcao: firestoreParticipant?.funcao || res.user.funcao,
-        status: firestoreParticipant?.status || res.user.status,
+        id: firestoreParticipant?.id || fbUser.uid,
+        nome: firestoreParticipant?.nome || fbUser.displayName || fbUser.email.split('@')[0],
+        email: fbUser.email,
+        funcao: firestoreParticipant?.funcao || (fbUser.email === 'paulocauan39@gmail.com' ? 'coordenador_aluno' : 'aluno'),
+        status: firestoreParticipant?.status || 'Ativo',
+        dataEntrada: firestoreParticipant?.dataEntrada || new Date().toISOString().split('T')[0],
+        createdAt: firestoreParticipant?.createdAt || new Date().toISOString(),
+        equipeId: firestoreParticipant?.equipeId,
+        equipeNome: firestoreParticipant?.equipeNome,
       };
 
       setStoredUserId(finalParticipant.id);
+      console.log('[AuthFlow] Final setting of user state in signInWithGoogle (currentUser):', finalParticipant);
       setCurrentUser(finalParticipant);
 
       // Sincronizar Firestore em segundo plano
       syncParticipantToFirestore(finalParticipant, fbUser.uid).catch((err) => {
-        console.warn('Sincronização secundária Firestore pós-login:', err);
+        console.warn('[AuthFlow] Sincronização secundária Firestore pós-login:', err);
       });
 
       // Atualizar lista sem apagar o usuário atual
@@ -201,7 +216,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return finalParticipant;
     } catch (err: any) {
       if (err?.code !== 'auth/popup-closed-by-user' && err?.code !== 'auth/cancelled-popup-request') {
-        console.error('Erro no login com Google:', err);
+        console.error('[AuthFlow] Erro no login com Google:', err);
       }
       throw err;
     } finally {

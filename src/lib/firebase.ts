@@ -84,74 +84,75 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
 }
 
 // Helper to fetch user/participant profile directly from Firestore (checking both 'usuarios' and 'participants')
-export async function getParticipantFromFirestore(emailOrIdOrUid: string): Promise<Participant | null> {
-  try {
-    const clean = emailOrIdOrUid.trim().toLowerCase();
+export async function getParticipantFromFirestore(uidOrEmail: string, optionalEmail?: string): Promise<Participant | null> {
+  const uid = uidOrEmail.trim();
+  const email = (optionalEmail || (uidOrEmail.includes('@') ? uidOrEmail : '')).trim().toLowerCase();
 
-    // 1. Check in 'usuarios' collection by doc ID (e.g. UID or email or ID)
+  // 1. Check in 'usuarios' collection by UID (direct doc access)
+  if (uid) {
     try {
-      const userDocRef = doc(db, 'usuarios', emailOrIdOrUid);
+      console.log(`[FirestoreFetch] getDoc: /usuarios/${uid}`);
+      const userDocRef = doc(db, 'usuarios', uid);
       const userDocSnap = await getDoc(userDocRef);
       if (userDocSnap.exists()) {
         const data = userDocSnap.data();
+        console.log(`[FirestoreFetch] Documento encontrado em /usuarios/${uid}:`, data);
         return {
-          id: data.id || emailOrIdOrUid,
-          nome: data.nome || data.displayName || data.name || clean.split('@')[0],
-          email: data.email || clean,
+          id: data.id || uid,
+          nome: data.nome || data.displayName || data.name || (email ? email.split('@')[0] : 'Usuário'),
+          email: data.email || email,
           funcao: (data.funcao || data.perfil || data.role || 'aluno'),
           status: data.status || 'Ativo',
           dataEntrada: data.dataEntrada || new Date().toISOString().split('T')[0],
           ...data,
         } as Participant;
       }
-    } catch (errUserDoc) {
-      console.warn('Consulta no Firestore (usuarios por id):', errUserDoc);
+    } catch (errUserDoc: any) {
+      console.warn(`[FirestoreFetch] Erro getDoc /usuarios/${uid}:`, errUserDoc?.code || errUserDoc?.message || errUserDoc);
     }
+  }
 
-    // 2. Check in 'usuarios' collection by email
+  // 2. Check in 'usuarios' collection by email if different from uid
+  if (email && email !== uid) {
     try {
-      const qUsuarios = query(collection(db, 'usuarios'), where('email', '==', clean));
-      const querySnapshotUsuarios = await getDocs(qUsuarios);
-      if (!querySnapshotUsuarios.empty) {
-        const data = querySnapshotUsuarios.docs[0].data();
+      console.log(`[FirestoreFetch] getDoc: /usuarios/${email}`);
+      const userEmailRef = doc(db, 'usuarios', email);
+      const userEmailSnap = await getDoc(userEmailRef);
+      if (userEmailSnap.exists()) {
+        const data = userEmailSnap.data();
+        console.log(`[FirestoreFetch] Documento encontrado em /usuarios/${email}:`, data);
         return {
-          id: data.id || querySnapshotUsuarios.docs[0].id,
-          nome: data.nome || data.displayName || data.name || clean.split('@')[0],
-          email: data.email || clean,
+          id: data.id || email,
+          nome: data.nome || data.displayName || data.name || email.split('@')[0],
+          email: data.email || email,
           funcao: (data.funcao || data.perfil || data.role || 'aluno'),
           status: data.status || 'Ativo',
           dataEntrada: data.dataEntrada || new Date().toISOString().split('T')[0],
           ...data,
         } as Participant;
       }
-    } catch (errUserQuery) {
-      console.warn('Consulta no Firestore (usuarios por email):', errUserQuery);
+    } catch (errUserEmail: any) {
+      console.warn(`[FirestoreFetch] Erro getDoc /usuarios/${email}:`, errUserEmail?.code || errUserEmail?.message || errUserEmail);
     }
+  }
 
-    // 3. Check in 'participants' collection by doc ID
+  // 3. Check in 'participants' collection by doc ID (email or uid)
+  if (email || uid) {
+    const targetKey = email || uid;
     try {
-      const partDocRef = doc(db, 'participants', emailOrIdOrUid);
+      console.log(`[FirestoreFetch] getDoc: /participants/${targetKey}`);
+      const partDocRef = doc(db, 'participants', targetKey);
       const partDocSnap = await getDoc(partDocRef);
       if (partDocSnap.exists()) {
-        return partDocSnap.data() as Participant;
+        const data = partDocSnap.data();
+        console.log(`[FirestoreFetch] Documento encontrado em /participants/${targetKey}:`, data);
+        return data as Participant;
       }
-    } catch (errPartDoc) {
-      console.warn('Consulta no Firestore (participants por id):', errPartDoc);
+    } catch (errPartDoc: any) {
+      console.warn(`[FirestoreFetch] Erro getDoc /participants/${targetKey}:`, errPartDoc?.code || errPartDoc?.message || errPartDoc);
     }
-
-    // 4. Check in 'participants' collection by email
-    try {
-      const qParticipants = query(collection(db, 'participants'), where('email', '==', clean));
-      const querySnapshotPart = await getDocs(qParticipants);
-      if (!querySnapshotPart.empty) {
-        return querySnapshotPart.docs[0].data() as Participant;
-      }
-    } catch (errPartQuery) {
-      console.warn('Consulta no Firestore (participants por email):', errPartQuery);
-    }
-  } catch (err) {
-    console.warn('Consulta ao Firestore de usuários/participantes retornou:', err);
   }
+
   return null;
 }
 
