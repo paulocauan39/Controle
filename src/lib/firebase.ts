@@ -89,49 +89,65 @@ export async function getParticipantFromFirestore(emailOrIdOrUid: string): Promi
     const clean = emailOrIdOrUid.trim().toLowerCase();
 
     // 1. Check in 'usuarios' collection by doc ID (e.g. UID or email or ID)
-    const userDocRef = doc(db, 'usuarios', emailOrIdOrUid);
-    const userDocSnap = await getDoc(userDocRef);
-    if (userDocSnap.exists()) {
-      const data = userDocSnap.data();
-      return {
-        id: data.id || emailOrIdOrUid,
-        nome: data.nome || data.displayName || data.name || clean.split('@')[0],
-        email: data.email || clean,
-        funcao: (data.funcao || data.perfil || data.role || 'aluno'),
-        status: data.status || 'Ativo',
-        dataEntrada: data.dataEntrada || new Date().toISOString().split('T')[0],
-        ...data,
-      } as Participant;
+    try {
+      const userDocRef = doc(db, 'usuarios', emailOrIdOrUid);
+      const userDocSnap = await getDoc(userDocRef);
+      if (userDocSnap.exists()) {
+        const data = userDocSnap.data();
+        return {
+          id: data.id || emailOrIdOrUid,
+          nome: data.nome || data.displayName || data.name || clean.split('@')[0],
+          email: data.email || clean,
+          funcao: (data.funcao || data.perfil || data.role || 'aluno'),
+          status: data.status || 'Ativo',
+          dataEntrada: data.dataEntrada || new Date().toISOString().split('T')[0],
+          ...data,
+        } as Participant;
+      }
+    } catch (errUserDoc) {
+      console.warn('Consulta no Firestore (usuarios por id):', errUserDoc);
     }
 
     // 2. Check in 'usuarios' collection by email
-    const qUsuarios = query(collection(db, 'usuarios'), where('email', '==', clean));
-    const querySnapshotUsuarios = await getDocs(qUsuarios);
-    if (!querySnapshotUsuarios.empty) {
-      const data = querySnapshotUsuarios.docs[0].data();
-      return {
-        id: data.id || querySnapshotUsuarios.docs[0].id,
-        nome: data.nome || data.displayName || data.name || clean.split('@')[0],
-        email: data.email || clean,
-        funcao: (data.funcao || data.perfil || data.role || 'aluno'),
-        status: data.status || 'Ativo',
-        dataEntrada: data.dataEntrada || new Date().toISOString().split('T')[0],
-        ...data,
-      } as Participant;
+    try {
+      const qUsuarios = query(collection(db, 'usuarios'), where('email', '==', clean));
+      const querySnapshotUsuarios = await getDocs(qUsuarios);
+      if (!querySnapshotUsuarios.empty) {
+        const data = querySnapshotUsuarios.docs[0].data();
+        return {
+          id: data.id || querySnapshotUsuarios.docs[0].id,
+          nome: data.nome || data.displayName || data.name || clean.split('@')[0],
+          email: data.email || clean,
+          funcao: (data.funcao || data.perfil || data.role || 'aluno'),
+          status: data.status || 'Ativo',
+          dataEntrada: data.dataEntrada || new Date().toISOString().split('T')[0],
+          ...data,
+        } as Participant;
+      }
+    } catch (errUserQuery) {
+      console.warn('Consulta no Firestore (usuarios por email):', errUserQuery);
     }
 
     // 3. Check in 'participants' collection by doc ID
-    const partDocRef = doc(db, 'participants', emailOrIdOrUid);
-    const partDocSnap = await getDoc(partDocRef);
-    if (partDocSnap.exists()) {
-      return partDocSnap.data() as Participant;
+    try {
+      const partDocRef = doc(db, 'participants', emailOrIdOrUid);
+      const partDocSnap = await getDoc(partDocRef);
+      if (partDocSnap.exists()) {
+        return partDocSnap.data() as Participant;
+      }
+    } catch (errPartDoc) {
+      console.warn('Consulta no Firestore (participants por id):', errPartDoc);
     }
 
     // 4. Check in 'participants' collection by email
-    const qParticipants = query(collection(db, 'participants'), where('email', '==', clean));
-    const querySnapshotPart = await getDocs(qParticipants);
-    if (!querySnapshotPart.empty) {
-      return querySnapshotPart.docs[0].data() as Participant;
+    try {
+      const qParticipants = query(collection(db, 'participants'), where('email', '==', clean));
+      const querySnapshotPart = await getDocs(qParticipants);
+      if (!querySnapshotPart.empty) {
+        return querySnapshotPart.docs[0].data() as Participant;
+      }
+    } catch (errPartQuery) {
+      console.warn('Consulta no Firestore (participants por email):', errPartQuery);
     }
   } catch (err) {
     console.warn('Consulta ao Firestore de usuários/participantes retornou:', err);
@@ -149,16 +165,28 @@ export async function syncParticipantToFirestore(participant: Participant, uid?:
     };
 
     // Save in 'participants' collection
-    const partRef = doc(db, 'participants', participant.id);
-    await setDoc(partRef, docData, { merge: true });
+    try {
+      const partRef = doc(db, 'participants', participant.id);
+      await setDoc(partRef, docData, { merge: true });
+    } catch (errPart) {
+      console.warn('Sincronização em participants:', errPart);
+    }
 
     // Save in 'usuarios' collection (both by participant.id and uid if provided)
-    const usuarioRef = doc(db, 'usuarios', participant.id);
-    await setDoc(usuarioRef, docData, { merge: true });
+    try {
+      const usuarioRef = doc(db, 'usuarios', participant.id);
+      await setDoc(usuarioRef, docData, { merge: true });
+    } catch (errUser) {
+      console.warn('Sincronização em usuarios:', errUser);
+    }
 
     if (uid && uid !== participant.id) {
-      const usuarioUidRef = doc(db, 'usuarios', uid);
-      await setDoc(usuarioUidRef, docData, { merge: true });
+      try {
+        const usuarioUidRef = doc(db, 'usuarios', uid);
+        await setDoc(usuarioUidRef, docData, { merge: true });
+      } catch (errUid) {
+        console.warn('Sincronização em usuarios por uid:', errUid);
+      }
     }
   } catch (err) {
     console.warn('Sincronização do participante no Firestore:', err);

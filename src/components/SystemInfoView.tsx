@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
-import { Info, ShieldCheck, CheckCircle2, AlertTriangle, BookOpen, UserCheck, Database, Settings, Tag } from 'lucide-react';
+import { Info, ShieldCheck, CheckCircle2, AlertTriangle, BookOpen, UserCheck, Database, Settings, Tag, Sun, Moon, Palette } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.js';
+import { useTheme } from '../context/ThemeContext.js';
 import { PromptCategoryManagerModal } from './PromptCategoryManagerModal.js';
 
 export const SystemInfoView: React.FC = () => {
   const { isCoordenadorAluno } = useAuth();
+  const { theme, isDark, toggleTheme } = useTheme();
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
 
   return (
@@ -105,6 +107,28 @@ export const SystemInfoView: React.FC = () => {
               <strong className="text-sky-900">Aluno:</strong> Visualização de suas tarefas, registro de experimentos e prompts, submissão de versões e preenchimento de testes.
             </div>
           </div>
+        </div>
+
+        {/* Preferências de Interface & Acessibilidade Visual */}
+        <div className="bg-white border border-slate-200 rounded-lg p-5 shadow-xs space-y-3 md:col-span-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-slate-900 font-bold text-sm">
+              <Palette className="w-4 h-4 text-indigo-600" />
+              Acessibilidade Visual e Modo de Pesquisa Noturna
+            </div>
+            <button
+              id="btn-system-toggle-theme"
+              type="button"
+              onClick={toggleTheme}
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-100 transition-colors shadow-xs"
+            >
+              {isDark ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-600" />}
+              {isDark ? 'Alternar para Modo Claro' : 'Alternar para Modo Escuro'}
+            </button>
+          </div>
+          <p className="text-xs text-slate-600 leading-relaxed">
+            O NexoIF oferece suporte nativo a temas Claro e Escuro (Dark Mode) para otimizar o conforto visual e reduzir a fadiga ocular durante longas sessões de leitura, análise de prompts e testes de inteligência artificial. Sua preferência é persistida localmente e respeita o padrão do seu sistema operacional.
+          </p>
         </div>
       </div>
 

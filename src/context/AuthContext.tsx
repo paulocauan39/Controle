@@ -43,16 +43,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isInitialized, setIsInitialized] = useState<boolean>(true);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Sync Firebase Auth state listener
+  // Sync Firebase Auth state listener as primary source of truth
   useEffect(() => {
+    let isMounted = true;
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setFirebaseUser(user);
+
       if (user && user.email) {
+        setIsLoading(true);
         try {
-          // 1. Try querying Firestore for the participant's assigned role and details
+          // 1. Fetch participant profile if any from Firestore
           const firestoreParticipant = await getParticipantFromFirestore(user.email);
 
-          // 2. Synchronize with backend API to ensure user is registered in project data
+          // 2. Synchronize with backend API
           const res = await api.loginWithGoogle({
             email: user.email,
             displayName: user.displayName,
@@ -60,10 +64,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             uid: user.uid,
           });
 
-          if (res.user) {
+          if (res.user && isMounted) {
             const finalParticipant: Participant = {
               ...res.user,
-              // If firestore has a custom role override, respect it
               funcao: firestoreParticipant?.funcao || res.user.funcao,
               status: firestoreParticipant?.status || res.user.status,
             };
@@ -71,16 +74,62 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setStoredUserId(finalParticipant.id);
             setCurrentUser(finalParticipant);
 
-            // 3. Persist/update in Firestore collection
-            await syncParticipantToFirestore(finalParticipant);
+            // Update users list in background
+            api.getUsers()
+              .then((allUsers) => {
+                if (isMounted) setUsersList(allUsers);
+              })
+              .catch((e) => {
+                console.warn('Atualização da lista de usuários:', e);
+              });
+
+            // 3. Persist in Firestore (non-blocking)
+            syncParticipantToFirestore(finalParticipant, user.uid).catch((err) => {
+              console.warn('Falha silenciosa ao sincronizar Firestore:', err);
+            });
           }
         } catch (err) {
-          console.error('Erro ao sincronizar usuário do Firebase com o Firestore:', err);
+          console.error('Erro ao sincronizar sessão autenticada:', err);
+        } finally {
+          if (isMounted) {
+            setIsLoading(false);
+          }
+        }
+      } else {
+        // Firebase Auth reports no active Firebase user
+        try {
+          const status = await api.getAuthStatus();
+          if (isMounted) setIsInitialized(status.initialized);
+
+          if (status.initialized) {
+            const allUsers = await api.getUsers();
+            if (isMounted) setUsersList(allUsers);
+
+            const savedId = getStoredUserId();
+            const matched = savedId ? allUsers.find((u: Participant) => u.id === savedId) : null;
+            if (isMounted) {
+              setCurrentUser(matched || null);
+            }
+          } else {
+            if (isMounted) {
+              setCurrentUser(null);
+              setUsersList([]);
+            }
+          }
+        } catch (err) {
+          console.warn('Verificação de estado inicial:', err);
+        } finally {
+          if (isMounted) {
+            setIsLoading(false);
+          }
         }
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
   }, []);
 
   const refreshUsers = async () => {
@@ -89,7 +138,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsInitialized(status.initialized);
 
       if (!status.initialized) {
-        setCurrentUser(null);
         setUsersList([]);
         return;
       }
@@ -98,23 +146,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUsersList(users);
 
       const savedId = getStoredUserId();
-      const matched = savedId ? users.find((u: Participant) => u.id === savedId) : null;
-
-      if (savedId && !matched) {
-        setStoredUserId('');
+      if (savedId) {
+        const matched = users.find((u: Participant) => u.id === savedId);
+        if (matched) {
+          setCurrentUser((prev) => (prev ? { ...prev, ...matched } : matched));
+        }
       }
-
-      setCurrentUser(matched || null);
     } catch (err) {
       console.error('Failed to load users/status', err);
-    } finally {
-      setIsLoading(false);
     }
   };
-
-  useEffect(() => {
-    refreshUsers();
-  }, []);
 
   const signInWithGoogle = async (): Promise<Participant> => {
     setIsLoading(true);
@@ -146,8 +187,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       setStoredUserId(finalParticipant.id);
       setCurrentUser(finalParticipant);
-      await syncParticipantToFirestore(finalParticipant);
-      await refreshUsers();
+
+      // Sincronizar Firestore em segundo plano
+      syncParticipantToFirestore(finalParticipant, fbUser.uid).catch((err) => {
+        console.warn('Sincronização secundária Firestore pós-login:', err);
+      });
+
+      // Atualizar lista sem apagar o usuário atual
+      api.getUsers().then((users) => {
+        setUsersList(users);
+      }).catch(console.warn);
+
       return finalParticipant;
     } catch (err: any) {
       if (err?.code !== 'auth/popup-closed-by-user' && err?.code !== 'auth/cancelled-popup-request') {

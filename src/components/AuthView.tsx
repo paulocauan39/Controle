@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext.js';
+import { useTheme } from '../context/ThemeContext.js';
 import { UserRole, Participant } from '../types.js';
 import { api } from '../services/api.js';
-import { LogIn, UserPlus, KeyRound, Shield, CheckCircle2, AlertCircle, Info, Gamepad2, ArrowRight } from 'lucide-react';
+import { LogIn, UserPlus, KeyRound, Shield, CheckCircle2, AlertCircle, Info, Gamepad2, ArrowRight, Sun, Moon } from 'lucide-react';
 
 interface AuthViewProps {
   onLoginSuccess?: () => void;
@@ -10,6 +11,7 @@ interface AuthViewProps {
 
 export const AuthView: React.FC<AuthViewProps> = ({ onLoginSuccess }) => {
   const { usersList, refreshUsers, switchUser, signInWithGoogle } = useAuth();
+  const { isDark, toggleTheme } = useTheme();
   const [tab, setTab] = useState<'login' | 'register' | 'recovery'>('login');
 
   // Login state
@@ -147,7 +149,21 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLoginSuccess }) => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 flex flex-col justify-center items-center px-4 py-12">
+    <div className="min-h-screen bg-slate-900 flex flex-col justify-center items-center px-4 py-12 relative">
+      {/* Top right Theme Toggle button */}
+      <div className="absolute top-4 right-4">
+        <button
+          id="btn-auth-theme-toggle"
+          type="button"
+          onClick={toggleTheme}
+          title={isDark ? 'Mudar para Modo Claro' : 'Mudar para Modo Escuro'}
+          aria-label="Alternar tema"
+          className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-amber-300 border border-slate-700 transition-colors shadow-sm flex items-center justify-center"
+        >
+          {isDark ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-300" />}
+        </button>
+      </div>
+
       {/* Institutional Branding */}
       <div className="w-full max-w-md text-center mb-8">
         <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-indigo-600 text-white font-black text-2xl shadow-lg shadow-indigo-600/30 mb-4 ring-4 ring-indigo-500/20">

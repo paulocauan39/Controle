@@ -47,6 +47,17 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Usuarios collection (Firebase Auth user profile mapping)
+    match /usuarios/{usuarioId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && (
+        usuarioId == request.auth.uid ||
+        (incoming().email is string && (incoming().email == request.auth.token.email || isAdmin())) ||
+        isAdmin()
+      );
+      allow delete: if isAdmin();
+    }
+
     // Teams validation
     function isValidTeam(data) {
       return data.id is string && isValidId(data.id) &&

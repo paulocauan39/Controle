@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ShieldAlert, ArrowLeft } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext.js';
+import { ThemeProvider } from './context/ThemeContext.js';
 import { Navbar, ActiveTab } from './components/Navbar.js';
 import { InitialSetup } from './components/InitialSetup.js';
 import { AuthView } from './components/AuthView.js';
@@ -289,8 +290,10 @@ const MainLayout: React.FC = () => {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <MainLayout />
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <MainLayout />
+      </AuthProvider>
+    </ThemeProvider>
   );
 }

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext.js';
+import { useTheme } from '../context/ThemeContext.js';
 import {
   LayoutDashboard,
   Users,
@@ -23,6 +24,8 @@ import {
   UserCircle,
   BookOpen,
   LogOut,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { UserRole } from '../types.js';
 
@@ -52,6 +55,7 @@ interface NavbarProps {
 
 export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
   const { currentUser, firebaseUser, usersList, switchUser, logout, isAluno, isProfessorColaborador } = useAuth();
+  const { theme, isDark, toggleTheme } = useTheme();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -110,8 +114,24 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
             </div>
           </div>
 
-          {/* User Profile & Switcher */}
-          <div className="hidden md:flex items-center gap-4">
+          {/* User Profile, Theme Toggle & Switcher */}
+          <div className="hidden md:flex items-center gap-3">
+            {/* Theme Toggle Button */}
+            <button
+              id="btn-theme-toggle"
+              type="button"
+              onClick={toggleTheme}
+              title={isDark ? 'Mudar para Modo Claro' : 'Mudar para Modo Escuro'}
+              aria-label="Alternar tema claro/escuro"
+              className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700/80 border border-slate-700 text-slate-300 hover:text-amber-300 transition-colors flex items-center justify-center shadow-xs"
+            >
+              {isDark ? (
+                <Sun className="w-4 h-4 text-amber-400 animate-pulse" />
+              ) : (
+                <Moon className="w-4 h-4 text-slate-300" />
+              )}
+            </button>
+
             {currentUser ? (
               <div className="relative">
                 <button
@@ -150,6 +170,18 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
                       <p className="text-sm font-bold text-slate-900 truncate">{currentUser.nome}</p>
                       <p className="text-xs text-slate-500 truncate">{currentUser.email}</p>
                       <div className="mt-1">{getRoleBadge(currentUser.funcao)}</div>
+                    </div>
+
+                    <div className="px-4 py-2 border-b border-slate-100 flex items-center justify-between">
+                      <span className="text-xs text-slate-600 font-medium">Tema Visual:</span>
+                      <button
+                        type="button"
+                        onClick={toggleTheme}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
+                      >
+                        {isDark ? <Sun className="w-3.5 h-3.5 text-amber-500" /> : <Moon className="w-3.5 h-3.5 text-slate-600" />}
+                        {isDark ? 'Modo Escuro' : 'Modo Claro'}
+                      </button>
                     </div>
 
                     <div className="px-4 py-1.5 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
@@ -200,8 +232,16 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
             )}
           </div>
 
-          {/* Mobile menu button */}
+          {/* Mobile menu button and theme toggle */}
           <div className="flex md:hidden items-center gap-2">
+            <button
+              type="button"
+              onClick={toggleTheme}
+              title={isDark ? 'Modo Claro' : 'Modo Escuro'}
+              className="p-2 rounded-md text-slate-300 hover:text-white hover:bg-slate-800"
+            >
+              {isDark ? <Sun className="w-5 h-5 text-amber-400" /> : <Moon className="w-5 h-5" />}
+            </button>
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="p-2 rounded-md text-slate-400 hover:text-white hover:bg-slate-800 focus:outline-none"
