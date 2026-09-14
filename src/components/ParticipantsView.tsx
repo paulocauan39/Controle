@@ -3,10 +3,10 @@ import { api } from '../services/api.js';
 import { Participant, Team, UserRole } from '../types.js';
 import { useAuth } from '../context/AuthContext.js';
 import { EmptyState } from './EmptyState.js';
-import { Plus, UserX, Edit2, CheckCircle2, XCircle } from 'lucide-react';
+import { Plus, UserX, Edit2, CheckCircle2, XCircle, Trash2, ShieldAlert, AlertTriangle } from 'lucide-react';
 
 export const ParticipantsView: React.FC = () => {
-  const { canManageAdmin, refreshUsers } = useAuth();
+  const { canManageAdmin, isAdmin, currentUser, refreshUsers } = useAuth();
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);
@@ -14,6 +14,13 @@ export const ParticipantsView: React.FC = () => {
   // Modal states
   const [modalOpen, setModalOpen] = useState(false);
   const [editingParticipant, setEditingParticipant] = useState<Participant | null>(null);
+
+  // Safe delete modal states
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [participantToDelete, setParticipantToDelete] = useState<Participant | null>(null);
+  const [confirmPhrase, setConfirmPhrase] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   // Form states
   const [nome, setNome] = useState('');
@@ -85,7 +92,7 @@ export const ParticipantsView: React.FC = () => {
           nome: nome.trim(),
           email: email.trim(),
           funcao,
-          equipeId: equipeId || undefined,
+          ...(equipeId ? { equipeId } : {}),
           status,
           dataEntrada,
         });
@@ -94,7 +101,7 @@ export const ParticipantsView: React.FC = () => {
           nome: nome.trim(),
           email: email.trim(),
           funcao,
-          equipeId: equipeId || undefined,
+          ...(equipeId ? { equipeId } : {}),
           status,
           dataEntrada,
         });
@@ -111,7 +118,7 @@ export const ParticipantsView: React.FC = () => {
   };
 
   const handleDeactivate = async (p: Participant) => {
-    if (!confirm(`Deseja desativar o participante "${p.nome}"? Por exigência de auditoria do projeto, participantes não são excluídos permanentemente.`)) {
+    if (!confirm(`Deseja desativar o participante "${p.nome}"? O participante ficará com status Inativo e não poderá realizar ações no sistema.`)) {
       return;
     }
 
@@ -124,8 +131,63 @@ export const ParticipantsView: React.FC = () => {
     }
   };
 
-  const getRoleBadge = (role: UserRole) => {
-    switch (role) {
+  const openDeleteModal = (p: Participant) => {
+    if (p.id === currentUser?.id || (currentUser?.email && p.email.toLowerCase() === currentUser.email.toLowerCase())) {
+      alert('Ação bloqueada: Não é permitido excluir a própria conta em uso.');
+      return;
+    }
+    setParticipantToDelete(p);
+    setConfirmPhrase('');
+    setDeleteError('');
+    setDeleteModalOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!participantToDelete) return;
+    if (confirmPhrase.trim().toUpperCase() !== 'EXCLUIR') {
+      setDeleteError('Digite exatamente a palavra EXCLUIR para confirmar.');
+      return;
+    }
+
+    try {
+      setIsDeleting(true);
+      setDeleteError('');
+      await api.deleteParticipant(participantToDelete.id);
+      setDeleteModalOpen(false);
+      setParticipantToDelete(null);
+      await loadData();
+      await refreshUsers();
+    } catch (err: any) {
+      setDeleteError(err.message || 'Erro ao excluir participante.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const getRoleBadge = (p: Participant) => {
+    const isPaulo = p.email?.toLowerCase() === 'paulocauan39@gmail.com';
+    const isUserAdmin = p.funcao === 'admin' || p.isAdmin === true || p.roles?.includes('admin') || isPaulo;
+    const isCoord = p.funcao === 'coordenador_aluno' || p.roles?.includes('coordenador_aluno');
+
+    if (isUserAdmin && isCoord) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold bg-purple-100 text-purple-800 rounded">
+          <ShieldAlert className="w-3 h-3 text-purple-600" />
+          Coord. Aluno & Admin
+        </span>
+      );
+    }
+
+    if (isUserAdmin) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold bg-rose-100 text-rose-800 rounded">
+          <ShieldAlert className="w-3 h-3 text-rose-600" />
+          Administrador
+        </span>
+      );
+    }
+
+    switch (p.funcao) {
       case 'coordenador_aluno':
         return <span className="px-2 py-0.5 text-xs font-semibold bg-indigo-100 text-indigo-800 rounded">Coordenador Aluno</span>;
       case 'professor_orientador':
@@ -135,7 +197,7 @@ export const ParticipantsView: React.FC = () => {
       case 'aluno':
         return <span className="px-2 py-0.5 text-xs font-semibold bg-sky-100 text-sky-800 rounded">Aluno</span>;
       default:
-        return role;
+        return <span className="px-2 py-0.5 text-xs font-semibold bg-slate-100 text-slate-800 rounded">{p.funcao}</span>;
     }
   };
 
@@ -192,7 +254,7 @@ export const ParticipantsView: React.FC = () => {
                   <tr key={p.id} className="hover:bg-slate-50/70 transition-colors">
                     <td className="py-3 px-4 font-semibold text-slate-900">{p.nome}</td>
                     <td className="py-3 px-4 text-slate-600 font-mono text-xs">{p.email}</td>
-                    <td className="py-3 px-4">{getRoleBadge(p.funcao)}</td>
+                    <td className="py-3 px-4">{getRoleBadge(p)}</td>
                     <td className="py-3 px-4 text-slate-600">{p.equipeNome || '—'}</td>
                     <td className="py-3 px-4">
                       {p.status === 'Ativo' ? (
@@ -219,12 +281,19 @@ export const ParticipantsView: React.FC = () => {
                           {p.status === 'Ativo' && (
                             <button
                               onClick={() => handleDeactivate(p)}
-                              title="Desativar Participante (não exclui histórico)"
-                              className="p-1.5 text-slate-500 hover:text-rose-700 hover:bg-rose-50 rounded transition-colors"
+                              title="Desativar Participante"
+                              className="p-1.5 text-slate-500 hover:text-amber-700 hover:bg-amber-50 rounded transition-colors"
                             >
                               <UserX className="w-4 h-4" />
                             </button>
                           )}
+                          <button
+                            onClick={() => openDeleteModal(p)}
+                            title="Excluir Participante (Confirmação Explícita)"
+                            className="p-1.5 text-slate-500 hover:text-rose-700 hover:bg-rose-50 rounded transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4 text-rose-500" />
+                          </button>
                         </div>
                       </td>
                     )}
@@ -297,6 +366,7 @@ export const ParticipantsView: React.FC = () => {
                     onChange={e => setFuncao(e.target.value as UserRole)}
                     className="w-full px-3 py-2 text-sm border border-slate-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-indigo-600"
                   >
+                    <option value="admin">Administrador (Controle Total)</option>
                     <option value="coordenador_aluno">Coordenador Aluno</option>
                     <option value="professor_orientador">Professor Orientador</option>
                     <option value="professor_colaborador">Professor Colaborador</option>
@@ -368,6 +438,90 @@ export const ParticipantsView: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Seguro de Exclusão Controlada (Administrativo) */}
+      {deleteModalOpen && participantToDelete && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 backdrop-blur-xs">
+          <div className="bg-white rounded-xl shadow-2xl border border-rose-200 w-full max-w-md overflow-hidden">
+            <div className="px-6 py-4 border-b border-rose-100 bg-rose-50 flex items-center gap-3">
+              <div className="p-2 bg-rose-100 text-rose-700 rounded-lg">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-sm font-bold text-rose-950">
+                  Confirmação de Exclusão de Usuário
+                </h2>
+                <p className="text-xs text-rose-700">Operação administrativa crítica</p>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {deleteError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-md">
+                  {deleteError}
+                </div>
+              )}
+
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Você está prestes a excluir permanentemente o seguinte participante do sistema:
+              </p>
+
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-1 text-xs">
+                <div><span className="font-semibold text-slate-700">Nome:</span> <span className="text-slate-900 font-medium">{participantToDelete.nome}</span></div>
+                <div><span className="font-semibold text-slate-700">E-mail:</span> <span className="text-slate-900 font-mono">{participantToDelete.email}</span></div>
+                <div><span className="font-semibold text-slate-700">Função:</span> <span className="text-slate-900">{participantToDelete.funcao}</span></div>
+                {participantToDelete.equipeNome && (
+                  <div><span className="font-semibold text-slate-700">Equipe Atual:</span> <span className="text-slate-900">{participantToDelete.equipeNome}</span></div>
+                )}
+              </div>
+
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-xs space-y-1">
+                <p className="font-semibold">Avisos importantes:</p>
+                <ul className="list-disc list-inside space-y-0.5 text-[11px]">
+                  <li>O participante será desvinculado de todas as equipes.</li>
+                  <li>Esta ação será registrada permanentemente na trilha de auditoria.</li>
+                  <li>Não é possível desfazer esta operação automaticamente.</li>
+                </ul>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Para confirmar, digite <span className="font-mono font-bold text-rose-600">EXCLUIR</span> abaixo:
+                </label>
+                <input
+                  type="text"
+                  value={confirmPhrase}
+                  onChange={e => setConfirmPhrase(e.target.value)}
+                  placeholder="EXCLUIR"
+                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-rose-500 font-mono"
+                />
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDeleteModalOpen(false);
+                    setParticipantToDelete(null);
+                  }}
+                  disabled={isDeleting}
+                  className="px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 rounded-md transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmDelete}
+                  disabled={isDeleting || confirmPhrase.trim().toUpperCase() !== 'EXCLUIR'}
+                  className="px-4 py-2 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-md transition-colors shadow-xs disabled:opacity-40"
+                >
+                  {isDeleting ? 'Excluindo...' : 'Confirmar Exclusão Definitiva'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

@@ -27,7 +27,13 @@ service cloud.firestore {
     function isAdmin() {
       return isSignedIn() && (
         request.auth.token.email == 'paulocauan39@gmail.com' ||
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        (exists(/databases/$(database)/documents/participants/$(request.auth.uid)) &&
+         (get(/databases/$(database)/documents/participants/$(request.auth.uid)).data.funcao == 'admin' ||
+          get(/databases/$(database)/documents/participants/$(request.auth.uid)).data.isAdmin == true)) ||
+        (exists(/databases/$(database)/documents/usuarios/$(request.auth.uid)) &&
+         (get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.funcao == 'admin' ||
+          get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.isAdmin == true))
       );
     }
 
@@ -36,7 +42,7 @@ service cloud.firestore {
       return data.id is string && isValidId(data.id) &&
         data.nome is string && data.nome.size() > 0 && data.nome.size() <= 200 &&
         data.email is string && data.email.size() <= 200 &&
-        data.funcao in ['coordenador_aluno', 'professor_orientador', 'professor_colaborador', 'aluno'] &&
+        data.funcao in ['admin', 'coordenador_aluno', 'professor_orientador', 'professor_colaborador', 'aluno'] &&
         data.status in ['Ativo', 'Inativo'];
     }
 

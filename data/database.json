@@ -56,6 +56,11 @@
       "nome": "Paulo Cauan",
       "email": "paulocauan39@gmail.com",
       "funcao": "coordenador_aluno",
+      "isAdmin": true,
+      "roles": [
+        "coordenador_aluno",
+        "admin"
+      ],
       "status": "Ativo",
       "dataEntrada": "2026-09-14",
       "createdAt": "2026-09-14T17:47:42.109Z"
@@ -560,6 +565,217 @@
     }
   ],
   "auditLogs": [
+    {
+      "id": "audit-1789426935228-7adxy",
+      "usuarioId": "part-coord-1",
+      "usuarioNome": "Lucas Mendes",
+      "usuarioRole": "coordenador_aluno",
+      "acao": "Validação Automatizada",
+      "registroAfetado": "Módulo de Testes",
+      "tipoEntidade": "Sistema",
+      "entidadeId": "test-runner-1",
+      "moduloAfetado": "Testes",
+      "data": "2026-09-14",
+      "horario": "23:02:15",
+      "alteracaoRealizada": "Execução bem-sucedida do plano de testes do NexoIF",
+      "timestamp": 1789426935228
+    },
+    {
+      "id": "audit-1789426935208-30x3u",
+      "usuarioId": "part-coord-1",
+      "usuarioNome": "Lucas Mendes",
+      "usuarioRole": "coordenador_aluno",
+      "acao": "Exclusão",
+      "registroAfetado": "Documento: Documento Técnico de Teste NexoIF - Atualizado",
+      "tipoEntidade": "Document",
+      "entidadeId": "doc-1789426935194-kv9p",
+      "moduloAfetado": "Document",
+      "data": "2026-09-14",
+      "horario": "23:02:15",
+      "alteracaoRealizada": "Documento removido do projeto.",
+      "timestamp": 1789426935208
+    },
+    {
+      "id": "audit-1789426935202-7vjkl",
+      "usuarioId": "part-coord-1",
+      "usuarioNome": "Lucas Mendes",
+      "usuarioRole": "coordenador_aluno",
+      "acao": "Atualização",
+      "registroAfetado": "Documento: Documento Técnico de Teste NexoIF - Atualizado",
+      "tipoEntidade": "Document",
+      "entidadeId": "doc-1789426935194-kv9p",
+      "moduloAfetado": "Document",
+      "data": "2026-09-14",
+      "horario": "23:02:15",
+      "alteracaoRealizada": "Documento atualizado. Versão: 1.0.1.",
+      "timestamp": 1789426935202
+    },
+    {
+      "id": "audit-1789426935195-4h5gi",
+      "usuarioId": "part-coord-1",
+      "usuarioNome": "Lucas Mendes",
+      "usuarioRole": "coordenador_aluno",
+      "acao": "Criação",
+      "registroAfetado": "Documento: Documento Técnico de Teste NexoIF",
+      "tipoEntidade": "Document",
+      "entidadeId": "doc-1789426935194-kv9p",
+      "moduloAfetado": "Document",
+      "data": "2026-09-14",
+      "horario": "23:02:15",
+      "alteracaoRealizada": "Novo documento (Especificação Técnica) cadastrado com nível de acesso 'Todos'.",
+      "timestamp": 1789426935195
+    },
+    {
+      "id": "audit-1789426935185-avonq",
+      "usuarioId": "part-coord-1",
+      "usuarioNome": "Lucas Mendes",
+      "usuarioRole": "coordenador_aluno",
+      "acao": "Desativação",
+      "registroAfetado": "Categoria de Prompts: Nova Categoria Teste 1789426935159 (Editada)",
+      "tipoEntidade": "PromptCategory",
+      "entidadeId": "cat-1789426935160-6k4n",
+      "moduloAfetado": "PromptCategory",
+      "data": "2026-09-14",
+      "horario": "23:02:15",
+      "alteracaoRealizada": "Categoria desativada pelo Coordenador Aluno.",
+      "timestamp": 1789426935185
+    },
+    {
+      "id": "audit-1789426935178-nkig7",
+      "usuarioId": "part-coord-1",
+      "usuarioNome": "Lucas Mendes",
+      "usuarioRole": "coordenador_aluno",
+      "acao": "Atualização",
+      "registroAfetado": "Categoria de Prompts: Nova Categoria Teste 1789426935159 (Editada)",
+      "tipoEntidade": "PromptCategory",
+      "entidadeId": "cat-1789426935160-6k4n",
+      "moduloAfetado": "PromptCategory",
+      "data": "2026-09-14",
+      "horario": "23:02:15",
+      "alteracaoRealizada": "Categoria editada pelo Coordenador Aluno. Status: Desativada.",
+      "timestamp": 1789426935178
+    },
+    {
+      "id": "audit-1789426935172-xeud1",
+      "usuarioId": "part-coord-1",
+      "usuarioNome": "Lucas Mendes",
+      "usuarioRole": "coordenador_aluno",
+      "acao": "Atualização",
+      "registroAfetado": "Categoria de Prompts: Nova Categoria Teste 1789426935159 (Editada)",
+      "tipoEntidade": "PromptCategory",
+      "entidadeId": "cat-1789426935160-6k4n",
+      "moduloAfetado": "PromptCategory",
+      "data": "2026-09-14",
+      "horario": "23:02:15",
+      "alteracaoRealizada": "Categoria editada pelo Coordenador Aluno. Status: Ativa.",
+      "timestamp": 1789426935172
+    },
+    {
+      "id": "audit-1789426935162-swezk",
+      "usuarioId": "part-coord-1",
+      "usuarioNome": "Lucas Mendes",
+      "usuarioRole": "coordenador_aluno",
+      "acao": "Criação",
+      "registroAfetado": "Categoria de Prompts: Nova Categoria Teste 1789426935159",
+      "tipoEntidade": "PromptCategory",
+      "entidadeId": "cat-1789426935160-6k4n",
+      "moduloAfetado": "PromptCategory",
+      "data": "2026-09-14",
+      "horario": "23:02:15",
+      "alteracaoRealizada": "Nova categoria de prompt criada pelo Coordenador Aluno. Status: Ativa.",
+      "timestamp": 1789426935162
+    },
+    {
+      "id": "audit-1789426935142-6363q",
+      "usuarioId": "part-coord-1",
+      "usuarioNome": "Lucas Mendes",
+      "usuarioRole": "coordenador_aluno",
+      "acao": "Exclusão",
+      "registroAfetado": "Tarefa: Tarefa de Teste Validação do Fluxo",
+      "tipoEntidade": "Task",
+      "entidadeId": "task-1789426935122-n8m9",
+      "moduloAfetado": "Tarefas",
+      "detalhes": {
+        "campoAlterado": "exclusao",
+        "valorAnterior": "Tarefa de Teste Validação do Fluxo",
+        "descricaoCurta": "Exclusão da tarefa \"Tarefa de Teste Validação do Fluxo\""
+      },
+      "data": "2026-09-14",
+      "horario": "23:02:15",
+      "alteracaoRealizada": "Tarefa \"Tarefa de Teste Validação do Fluxo\" excluída do cronograma.",
+      "timestamp": 1789426935142
+    },
+    {
+      "id": "audit-1789426935135-xxa21",
+      "usuarioId": "part-coord-1",
+      "usuarioNome": "Lucas Mendes",
+      "usuarioRole": "coordenador_aluno",
+      "acao": "Mudança de Status",
+      "registroAfetado": "Tarefa: Tarefa de Teste Validação do Fluxo",
+      "tipoEntidade": "Task",
+      "entidadeId": "task-1789426935122-n8m9",
+      "moduloAfetado": "Tarefas",
+      "detalhes": {
+        "campoAlterado": "status",
+        "valorAnterior": "Em andamento",
+        "novoValor": "Concluída",
+        "descricaoCurta": "Tarefa \"Tarefa de Teste Validação do Fluxo\" - Status: Concluída (Concluída em 2026-03-15)"
+      },
+      "data": "2026-09-14",
+      "horario": "23:02:15",
+      "alteracaoRealizada": "Transição de status: \"Em andamento\" ➔ \"Concluída\". Data de Conclusão: 2026-03-15",
+      "timestamp": 1789426935135
+    },
+    {
+      "id": "audit-1789426935124-36u26",
+      "usuarioId": "part-coord-1",
+      "usuarioNome": "Lucas Mendes",
+      "usuarioRole": "coordenador_aluno",
+      "acao": "Criação",
+      "registroAfetado": "Tarefa: Tarefa de Teste Validação do Fluxo",
+      "tipoEntidade": "Task",
+      "entidadeId": "task-1789426935122-n8m9",
+      "moduloAfetado": "Tarefas",
+      "detalhes": {
+        "campoAlterado": "novo_registro",
+        "novoValor": "Tarefa de Teste Validação do Fluxo",
+        "descricaoCurta": "Criada tarefa \"Tarefa de Teste Validação do Fluxo\" (Média, Status: Em andamento)"
+      },
+      "data": "2026-09-14",
+      "horario": "23:02:15",
+      "alteracaoRealizada": "Nova tarefa criada para Lucas Mendes. Prazo: 2026-10-15, Prioridade: Média",
+      "timestamp": 1789426935124
+    },
+    {
+      "id": "audit-1789426935112-53x0b",
+      "usuarioId": "part-coord-1",
+      "usuarioNome": "Lucas Mendes",
+      "usuarioRole": "coordenador_aluno",
+      "acao": "Exclusão",
+      "registroAfetado": "Etapa do Cronograma: Etapa de Validação de Teste",
+      "tipoEntidade": "ScheduleMilestone",
+      "entidadeId": "sched-1789426935083-co5l",
+      "moduloAfetado": "ScheduleMilestone",
+      "data": "2026-09-14",
+      "horario": "23:02:15",
+      "alteracaoRealizada": "Exclusão da etapa do cronograma.",
+      "timestamp": 1789426935112
+    },
+    {
+      "id": "audit-1789426935084-3ya4x",
+      "usuarioId": "part-coord-1",
+      "usuarioNome": "Lucas Mendes",
+      "usuarioRole": "coordenador_aluno",
+      "acao": "Criação",
+      "registroAfetado": "Etapa do Cronograma: Etapa de Validação de Teste",
+      "tipoEntidade": "ScheduleMilestone",
+      "entidadeId": "sched-1789426935083-co5l",
+      "moduloAfetado": "ScheduleMilestone",
+      "data": "2026-09-14",
+      "horario": "23:02:15",
+      "alteracaoRealizada": "Prazo estabelecido até 2026-12-31",
+      "timestamp": 1789426935084
+    },
     {
       "id": "audit-1789426818859-auvyg",
       "usuarioId": "part-coord-1",
@@ -4356,7 +4572,8 @@
     "Nova Categoria Teste 1789424982108 (Editada)",
     "Nova Categoria Teste 1789425017794 (Editada)",
     "Nova Categoria Teste 1789426504607 (Editada)",
-    "Nova Categoria Teste 1789426818796 (Editada)"
+    "Nova Categoria Teste 1789426818796 (Editada)",
+    "Nova Categoria Teste 1789426935159 (Editada)"
   ],
   "promptCategoryItems": [
     {
@@ -4533,6 +4750,13 @@
       "descricao": "Descrição atualizada",
       "ativa": false,
       "createdAt": "2026-09-14T23:00:18.800Z"
+    },
+    {
+      "id": "cat-1789426935160-6k4n",
+      "nome": "Nova Categoria Teste 1789426935159 (Editada)",
+      "descricao": "Descrição atualizada",
+      "ativa": false,
+      "createdAt": "2026-09-14T23:02:15.160Z"
     }
   ],
   "documents": [

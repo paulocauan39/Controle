@@ -84,7 +84,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         nome: nome.trim(),
         email: email.trim(),
         funcao,
-        equipeId: equipeId || undefined,
+        ...(equipeId ? { equipeId } : {}),
       });
 
       setSuccessMsg(`Usuário ${res.nome} cadastrado com sucesso!`);

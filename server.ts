@@ -402,7 +402,7 @@ app.put('/api/participants/:id', requireRoles('coordenador_aluno'), (req: Authen
   res.json(updated);
 });
 
-// Rule 8: Não excluir permanentemente um participante que possua histórico relevante.
+// Rule 8: Não excluir permanentemente um participante que possua histórico relevante sem ação administrativa explícita.
 app.patch('/api/participants/:id/deactivate', requireRoles('coordenador_aluno'), (req: AuthenticatedRequest, res: Response) => {
   const data = db.getData();
   const participant = data.participants.find(p => p.id === req.params.id);
@@ -423,6 +423,42 @@ app.patch('/api/participants/:id/deactivate', requireRoles('coordenador_aluno'),
   );
 
   res.json(participant);
+});
+
+// Exclusão controlada de participante com permissão administrativa
+app.delete('/api/participants/:id', requireRoles('coordenador_aluno'), (req: AuthenticatedRequest, res: Response) => {
+  const data = db.getData();
+  const participant = data.participants.find(p => p.id === req.params.id);
+  if (!participant) {
+    return res.status(404).json({ error: 'Participante não encontrado.' });
+  }
+
+  if (participant.id === req.user?.id || (req.user?.email && participant.email?.toLowerCase() === req.user.email.toLowerCase())) {
+    return res.status(400).json({ error: 'Ação bloqueada: Não é permitido excluir a própria conta em uso.' });
+  }
+
+  // Desvincular de equipes
+  data.teams.forEach(t => {
+    t.participantesIds = t.participantesIds.filter(id => id !== participant.id);
+    if (t.responsavelId === participant.id) {
+      t.responsavelId = req.user?.id || '';
+      t.responsavelNome = req.user?.nome || 'Administrador';
+    }
+  });
+
+  data.participants = data.participants.filter(p => p.id !== participant.id);
+  db.save();
+
+  db.logAudit(
+    req.user!,
+    'Exclusão',
+    `Participante: ${participant.nome} (${participant.email})`,
+    'Participant',
+    participant.id,
+    'Participante removido do sistema por ação do Administrador/Coordenador.'
+  );
+
+  res.json({ success: true, message: 'Participante removido com sucesso.' });
 });
 
 // ==================== TEAMS ROUTES ====================
@@ -2375,8 +2411,8 @@ app.put('/api/documents/:id', (req: AuthenticatedRequest, res: Response) => {
 
   const current = data.documents[index];
 
-  // Permission check: Coordinator, Professors, or original Author can edit
-  const isPrivileged = ['coordenador_aluno', 'professor_orientador', 'professor_colaborador'].includes(req.user?.role || '');
+  // Permission check: Admin, Coordinator, Professors, or original Author can edit
+  const isPrivileged = Boolean(req.user?.isAdmin || ['admin', 'coordenador_aluno', 'professor_orientador', 'professor_colaborador'].includes(req.user?.role || ''));
   const isAuthor = current.autorId === req.user?.id;
 
   if (!isPrivileged && !isAuthor) {
@@ -2426,7 +2462,7 @@ app.delete('/api/documents/:id', (req: AuthenticatedRequest, res: Response) => {
     return res.status(404).json({ error: 'Documento não encontrado.' });
   }
 
-  const isPrivileged = ['coordenador_aluno', 'professor_orientador', 'professor_colaborador'].includes(req.user?.role || '');
+  const isPrivileged = Boolean(req.user?.isAdmin || ['admin', 'coordenador_aluno', 'professor_orientador', 'professor_colaborador'].includes(req.user?.role || ''));
   const isAuthor = doc.autorId === req.user?.id;
 
   if (!isPrivileged && !isAuthor) {

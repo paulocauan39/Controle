@@ -1,4 +1,5 @@
 export type UserRole = 
+  | 'admin'
   | 'coordenador_aluno'
   | 'professor_orientador'
   | 'professor_colaborador'
@@ -9,6 +10,8 @@ export interface Participant {
   nome: string;
   email: string;
   funcao: UserRole;
+  isAdmin?: boolean;
+  roles?: UserRole[];
   equipeId?: string;
   equipeNome?: string;
   status: 'Ativo' | 'Inativo';

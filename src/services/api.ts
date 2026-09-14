@@ -64,6 +64,7 @@ export const api = {
   createParticipant: (data: any) => request<any>('/participants', { method: 'POST', body: JSON.stringify(data) }),
   updateParticipant: (id: string, data: any) => request<any>(`/participants/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deactivateParticipant: (id: string) => request<any>(`/participants/${id}/deactivate`, { method: 'PATCH' }),
+  deleteParticipant: (id: string) => request<any>(`/participants/${id}`, { method: 'DELETE' }),
 
   // Teams
   getTeams: () => request<any[]>('/teams'),

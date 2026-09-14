@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 
 export const DocumentsView: React.FC = () => {
-  const { currentUser, isCoordenadorAluno, isProfessorOrientador, isProfessorColaborador, isAluno } = useAuth();
+  const { currentUser, isCoordenadorAluno, isProfessorOrientador, isProfessorColaborador, isAluno, isAdmin } = useAuth();
   const [documents, setDocuments] = useState<ProjectDocument[]>([]);
   const [games, setGames] = useState<Game[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,7 +53,7 @@ export const DocumentsView: React.FC = () => {
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const canManagePrivileged = isCoordenadorAluno || isProfessorOrientador || isProfessorColaborador;
+  const canManagePrivileged = isAdmin || isCoordenadorAluno || isProfessorOrientador || isProfessorColaborador;
 
   const loadData = async () => {
     try {

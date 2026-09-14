@@ -8,6 +8,8 @@ export interface AuthenticatedRequest extends Request {
     nome: string;
     email: string;
     role: UserRole;
+    isAdmin?: boolean;
+    roles?: UserRole[];
     equipeId?: string;
   };
 }
@@ -60,11 +62,16 @@ export function authMiddleware(req: AuthenticatedRequest, res: Response, next: N
     return res.status(403).json({ error: 'Este participante está desativado no projeto.' });
   }
 
+  const isPaulo = participant.email?.toLowerCase() === 'paulocauan39@gmail.com';
+  const isAdmin = participant.funcao === 'admin' || participant.isAdmin === true || participant.roles?.includes('admin') || isPaulo;
+
   req.user = {
     id: participant.id,
     nome: participant.nome,
     email: participant.email,
     role: participant.funcao,
+    isAdmin,
+    roles: participant.roles || (isAdmin ? [participant.funcao, 'admin'] : [participant.funcao]),
     equipeId: participant.equipeId,
   };
 
@@ -75,6 +82,11 @@ export function requireRoles(...allowedRoles: UserRole[]) {
   return (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     if (!req.user) {
       return res.status(401).json({ error: 'Autenticação necessária.' });
+    }
+
+    // Administrador possui poderes administrativos totais sobre o sistema
+    if (req.user.isAdmin || req.user.role === 'admin' || req.user.roles?.includes('admin')) {
+      return next();
     }
 
     if (!allowedRoles.includes(req.user.role)) {
@@ -89,6 +101,8 @@ export function requireRoles(...allowedRoles: UserRole[]) {
 
 export function getRoleLabel(role: UserRole): string {
   switch (role) {
+    case 'admin':
+      return 'Administrador';
     case 'coordenador_aluno':
       return 'Coordenador Aluno';
     case 'professor_orientador':

@@ -127,12 +127,12 @@ export const TasksView: React.FC = () => {
         titulo: titulo.trim(),
         descricao: descricao.trim(),
         responsavelId,
-        equipeId: equipeId || undefined,
-        jogoId: jogoId || undefined,
+        ...(equipeId ? { equipeId } : {}),
+        ...(jogoId ? { jogoId } : {}),
         prioridade,
         status,
         prazo,
-        dataConclusao: status === 'Concluída' ? dataConclusao.trim() : undefined,
+        ...(status === 'Concluída' && dataConclusao.trim() ? { dataConclusao: dataConclusao.trim() } : {}),
         observacoes: observacoes.trim(),
       };
 

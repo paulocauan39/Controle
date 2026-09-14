@@ -5,9 +5,10 @@ import { useTheme } from '../context/ThemeContext.js';
 import { PromptCategoryManagerModal } from './PromptCategoryManagerModal.js';
 
 export const SystemInfoView: React.FC = () => {
-  const { isCoordenadorAluno } = useAuth();
+  const { isCoordenadorAluno, isAdmin } = useAuth();
   const { theme, isDark, toggleTheme } = useTheme();
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
+  const canManageCategories = isAdmin || isCoordenadorAluno;
 
   return (
     <div className="space-y-6">
@@ -20,7 +21,7 @@ export const SystemInfoView: React.FC = () => {
           </p>
         </div>
 
-        {isCoordenadorAluno && (
+        {canManageCategories && (
           <button
             onClick={() => setCategoryModalOpen(true)}
             className="inline-flex items-center gap-2 px-3.5 py-2 bg-indigo-900 hover:bg-indigo-800 text-white text-xs font-semibold rounded-md shadow-xs transition-colors self-start sm:self-auto"
@@ -132,7 +133,7 @@ export const SystemInfoView: React.FC = () => {
         </div>
       </div>
 
-      {isCoordenadorAluno && (
+      {canManageCategories && (
         <PromptCategoryManagerModal
           isOpen={categoryModalOpen}
           onClose={() => setCategoryModalOpen(false)}

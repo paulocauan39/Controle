@@ -25,6 +25,7 @@ interface AuthContextType {
   refreshAuth: () => Promise<void>;
   setupInitialUser: (data: { nome: string; email: string; funcao: UserRole; dataEntrada?: string }) => Promise<void>;
   roleLabel: string;
+  isAdmin: boolean;
   isCoordenadorAluno: boolean;
   isProfessorOrientador: boolean;
   isProfessorColaborador: boolean;
@@ -65,11 +66,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
 
           if (isMounted) {
+            const isPaulo = (user.email || '').toLowerCase() === 'paulocauan39@gmail.com';
+            const isAdminUser = firestoreParticipant?.funcao === 'admin' || firestoreParticipant?.isAdmin === true || firestoreParticipant?.roles?.includes('admin') || isPaulo;
+
             const finalParticipant: Participant = {
               id: firestoreParticipant?.id || user.uid,
               nome: firestoreParticipant?.nome || user.displayName || (user.email ? user.email.split('@')[0] : 'Usuário'),
               email: user.email,
-              funcao: firestoreParticipant?.funcao || (user.email === 'paulocauan39@gmail.com' ? 'coordenador_aluno' : 'aluno'),
+              funcao: firestoreParticipant?.funcao || (isPaulo ? 'coordenador_aluno' : 'aluno'),
+              isAdmin: isAdminUser,
+              roles: firestoreParticipant?.roles || (isAdminUser ? [firestoreParticipant?.funcao || 'coordenador_aluno', 'admin'] : [firestoreParticipant?.funcao || 'aluno']),
               status: firestoreParticipant?.status || 'Ativo',
               dataEntrada: firestoreParticipant?.dataEntrada || new Date().toISOString().split('T')[0],
               createdAt: firestoreParticipant?.createdAt || new Date().toISOString(),
@@ -187,11 +193,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.warn('[AuthFlow] Firestore fetch error in signInWithGoogle:', fErr?.code || fErr?.message || fErr);
       }
 
+      const isPaulo = (fbUser.email || '').toLowerCase() === 'paulocauan39@gmail.com';
+      const isAdminUser = firestoreParticipant?.funcao === 'admin' || firestoreParticipant?.isAdmin === true || firestoreParticipant?.roles?.includes('admin') || isPaulo;
+
       const finalParticipant: Participant = {
         id: firestoreParticipant?.id || fbUser.uid,
-        nome: firestoreParticipant?.nome || fbUser.displayName || fbUser.email.split('@')[0],
+        nome: firestoreParticipant?.nome || fbUser.displayName || (fbUser.email ? fbUser.email.split('@')[0] : 'Usuário'),
         email: fbUser.email,
-        funcao: firestoreParticipant?.funcao || (fbUser.email === 'paulocauan39@gmail.com' ? 'coordenador_aluno' : 'aluno'),
+        funcao: firestoreParticipant?.funcao || (isPaulo ? 'coordenador_aluno' : 'aluno'),
+        isAdmin: isAdminUser,
+        roles: firestoreParticipant?.roles || (isAdminUser ? [firestoreParticipant?.funcao || 'coordenador_aluno', 'admin'] : [firestoreParticipant?.funcao || 'aluno']),
         status: firestoreParticipant?.status || 'Ativo',
         dataEntrada: firestoreParticipant?.dataEntrada || new Date().toISOString().split('T')[0],
         createdAt: firestoreParticipant?.createdAt || new Date().toISOString(),
@@ -256,7 +267,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const roleLabel = useMemo(() => {
     if (!currentUser) return '';
+    const hasAdmin = currentUser.isAdmin || currentUser.roles?.includes('admin') || currentUser.funcao === 'admin';
+    const isCoord = currentUser.funcao === 'coordenador_aluno' || currentUser.roles?.includes('coordenador_aluno');
+    if (hasAdmin && isCoord) {
+      return 'Coordenador Aluno & Administrador';
+    }
     switch (currentUser.funcao) {
+      case 'admin':
+        return 'Administrador';
       case 'coordenador_aluno':
         return 'Coordenador Aluno';
       case 'professor_orientador':
@@ -270,14 +288,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [currentUser]);
 
-  const isCoordenadorAluno = currentUser?.funcao === 'coordenador_aluno';
+  const isAdmin = Boolean(
+    currentUser?.funcao === 'admin' ||
+    currentUser?.isAdmin === true ||
+    currentUser?.roles?.includes('admin') ||
+    currentUser?.email?.toLowerCase() === 'paulocauan39@gmail.com'
+  );
+  const isCoordenadorAluno = Boolean(currentUser?.funcao === 'coordenador_aluno' || currentUser?.roles?.includes('coordenador_aluno'));
   const isProfessorOrientador = currentUser?.funcao === 'professor_orientador';
   const isProfessorColaborador = currentUser?.funcao === 'professor_colaborador';
   const isAluno = currentUser?.funcao === 'aluno';
 
-  const canManageAdmin = isCoordenadorAluno;
-  const canRegisterExperiments = isCoordenadorAluno || isAluno;
-  const canSubmitEvaluations = isCoordenadorAluno || isAluno;
+  // Administrador tem poderes de gestão total sobre todos os módulos
+  const canManageAdmin = isAdmin || isCoordenadorAluno;
+  const canRegisterExperiments = isAdmin || isCoordenadorAluno || isAluno;
+  const canSubmitEvaluations = isAdmin || isCoordenadorAluno || isAluno;
 
   return (
     <AuthContext.Provider
@@ -296,6 +321,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         refreshAuth: refreshUsers,
         setupInitialUser,
         roleLabel,
+        isAdmin,
         isCoordenadorAluno,
         isProfessorOrientador,
         isProfessorColaborador,

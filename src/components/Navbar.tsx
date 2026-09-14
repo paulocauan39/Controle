@@ -26,8 +26,9 @@ import {
   LogOut,
   Sun,
   Moon,
+  ShieldAlert,
 } from 'lucide-react';
-import { UserRole } from '../types.js';
+import { Participant, UserRole } from '../types.js';
 
 export type ActiveTab =
   | 'dashboard'
@@ -54,12 +55,32 @@ interface NavbarProps {
 }
 
 export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
-  const { currentUser, firebaseUser, usersList, switchUser, logout, isAluno, isProfessorColaborador } = useAuth();
+  const { currentUser, firebaseUser, usersList, switchUser, logout, isAluno, isProfessorColaborador, isAdmin } = useAuth();
   const { theme, isDark, toggleTheme } = useTheme();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const getRoleBadge = (role?: UserRole) => {
+  const getRoleBadge = (role?: UserRole, participant?: Participant | null) => {
+    const isPaulo = participant?.email?.toLowerCase() === 'paulocauan39@gmail.com';
+    const hasAdmin = participant?.isAdmin || participant?.roles?.includes('admin') || role === 'admin' || isPaulo;
+    const isCoord = role === 'coordenador_aluno' || participant?.roles?.includes('coordenador_aluno');
+
+    if (hasAdmin && isCoord) {
+      return (
+        <span className="px-2 py-0.5 text-[11px] font-semibold bg-purple-100 text-purple-800 rounded border border-purple-200 flex items-center gap-1">
+          <ShieldAlert className="w-3 h-3 text-purple-600" />
+          Coord. & Admin
+        </span>
+      );
+    }
+    if (hasAdmin) {
+      return (
+        <span className="px-2 py-0.5 text-[11px] font-semibold bg-rose-100 text-rose-800 rounded border border-rose-200 flex items-center gap-1">
+          <ShieldAlert className="w-3 h-3 text-rose-600" />
+          Admin
+        </span>
+      );
+    }
     switch (role) {
       case 'coordenador_aluno':
         return <span className="px-2 py-0.5 text-[11px] font-semibold bg-indigo-100 text-indigo-800 rounded border border-indigo-200">Coordenador Aluno</span>;
@@ -74,9 +95,12 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
     }
   };
 
+  const canAccessParticipants = isAdmin || (!isAluno && !isProfessorColaborador);
+  const canAccessHistory = isAdmin || !isAluno;
+
   const navItems = [
     { id: 'dashboard' as ActiveTab, label: 'Visão Geral', icon: LayoutDashboard },
-    ...(!isAluno && !isProfessorColaborador ? [{ id: 'participantes' as ActiveTab, label: 'Participantes', icon: Users }] : []),
+    ...(canAccessParticipants ? [{ id: 'participantes' as ActiveTab, label: 'Participantes', icon: Users }] : []),
     { id: 'equipes' as ActiveTab, label: 'Equipes', icon: Briefcase },
     { id: 'jogos' as ActiveTab, label: 'Jogos', icon: Gamepad2 },
     { id: 'tarefas' as ActiveTab, label: 'Tarefas', icon: CheckSquare },
@@ -89,7 +113,7 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
     { id: 'comparacao' as ActiveTab, label: 'Comparação IAs', icon: Scale },
     { id: 'cronograma' as ActiveTab, label: 'Cronograma', icon: Calendar },
     { id: 'documentacao' as ActiveTab, label: 'Documentação', icon: BookOpen },
-    ...(!isAluno ? [{ id: 'historico' as ActiveTab, label: 'Histórico', icon: History }] : []),
+    ...(canAccessHistory ? [{ id: 'historico' as ActiveTab, label: 'Histórico', icon: History }] : []),
     { id: 'relatorios' as ActiveTab, label: 'Relatórios', icon: FileText },
     { id: 'sistema' as ActiveTab, label: 'Sistema', icon: Info },
   ];
@@ -155,7 +179,7 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
                       {currentUser.nome}
                     </span>
                     <div className="flex items-center gap-1.5 mt-0.5">
-                      {getRoleBadge(currentUser.funcao)}
+                      {getRoleBadge(currentUser.funcao, currentUser)}
                     </div>
                   </div>
                   <ChevronDown className="w-4 h-4 text-slate-400 ml-1" />
@@ -169,7 +193,7 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
                       </p>
                       <p className="text-sm font-bold text-slate-900 truncate">{currentUser.nome}</p>
                       <p className="text-xs text-slate-500 truncate">{currentUser.email}</p>
-                      <div className="mt-1">{getRoleBadge(currentUser.funcao)}</div>
+                      <div className="mt-1">{getRoleBadge(currentUser.funcao, currentUser)}</div>
                     </div>
 
                     <div className="px-4 py-2 border-b border-slate-100 flex items-center justify-between">
@@ -204,7 +228,7 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
                             <div className="truncate">{u.nome}</div>
                             <div className="text-[10px] text-slate-400 truncate">{u.email}</div>
                           </div>
-                          <div className="shrink-0 ml-2">{getRoleBadge(u.funcao)}</div>
+                          <div className="shrink-0 ml-2">{getRoleBadge(u.funcao, u)}</div>
                         </button>
                       ))}
                     </div>
@@ -285,7 +309,7 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
             <div className="p-3 mb-2 bg-slate-900 rounded-lg border border-slate-800">
               <div className="text-xs text-slate-400">Usuário ativo:</div>
               <div className="text-sm font-semibold text-white">{currentUser.nome}</div>
-              <div className="mt-1">{getRoleBadge(currentUser.funcao)}</div>
+              <div className="mt-1">{getRoleBadge(currentUser.funcao, currentUser)}</div>
             </div>
           )}
 
