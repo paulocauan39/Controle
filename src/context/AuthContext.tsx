@@ -73,8 +73,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               status: firestoreParticipant?.status || 'Ativo',
               dataEntrada: firestoreParticipant?.dataEntrada || new Date().toISOString().split('T')[0],
               createdAt: firestoreParticipant?.createdAt || new Date().toISOString(),
-              equipeId: firestoreParticipant?.equipeId,
-              equipeNome: firestoreParticipant?.equipeNome,
+              ...(firestoreParticipant?.equipeId ? { equipeId: firestoreParticipant.equipeId } : {}),
+              ...(firestoreParticipant?.equipeNome ? { equipeNome: firestoreParticipant.equipeNome } : {}),
             };
 
             setStoredUserId(finalParticipant.id);
@@ -195,8 +195,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         status: firestoreParticipant?.status || 'Ativo',
         dataEntrada: firestoreParticipant?.dataEntrada || new Date().toISOString().split('T')[0],
         createdAt: firestoreParticipant?.createdAt || new Date().toISOString(),
-        equipeId: firestoreParticipant?.equipeId,
-        equipeNome: firestoreParticipant?.equipeNome,
+        ...(firestoreParticipant?.equipeId ? { equipeId: firestoreParticipant.equipeId } : {}),
+        ...(firestoreParticipant?.equipeNome ? { equipeNome: firestoreParticipant.equipeNome } : {}),
       };
 
       setStoredUserId(finalParticipant.id);

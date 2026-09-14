@@ -159,11 +159,31 @@ export async function getParticipantFromFirestore(uidOrEmail: string, optionalEm
 // Helper to save/sync user and participant profile in Firestore
 export async function syncParticipantToFirestore(participant: Participant, uid?: string): Promise<void> {
   try {
-    const docData = {
-      ...participant,
+    const docData: Record<string, any> = {
+      id: participant.id,
+      nome: participant.nome,
+      email: participant.email,
+      funcao: participant.funcao,
       perfil: participant.funcao,
+      status: participant.status,
+      dataEntrada: participant.dataEntrada,
+      createdAt: participant.createdAt,
       updatedAt: new Date().toISOString(),
     };
+
+    if (participant.equipeId) {
+      docData.equipeId = participant.equipeId;
+    }
+    if (participant.equipeNome) {
+      docData.equipeNome = participant.equipeNome;
+    }
+
+    // Sanitize any remaining undefined properties
+    for (const key of Object.keys(docData)) {
+      if (docData[key] === undefined) {
+        delete docData[key];
+      }
+    }
 
     // Save in 'participants' collection
     try {
