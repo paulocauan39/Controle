@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext.js';
 import { useTheme } from '../context/ThemeContext.js';
 import { UserRole, Participant } from '../types.js';
@@ -14,8 +14,13 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLoginSuccess }) => {
   const { isDark, toggleTheme } = useTheme();
   const [tab, setTab] = useState<'login' | 'register' | 'recovery'>('login');
 
+  // Ensure user list is synced from Firestore on mount
+  useEffect(() => {
+    refreshUsers().catch((e) => console.warn('[AuthView] Sync users:', e));
+  }, []);
+
   // Login state
-  const [selectedUserId, setSelectedUserId] = useState<string>(usersList[0]?.id || '');
+  const [selectedUserId, setSelectedUserId] = useState<string>('');
   const [loginEmail, setLoginEmail] = useState<string>('');
   const [loginMethod, setLoginMethod] = useState<'select' | 'email'>('select');
 
@@ -33,6 +38,13 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLoginSuccess }) => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
+
+  // Update selectedUserId default when usersList loads
+  useEffect(() => {
+    if (usersList.length > 0 && !selectedUserId) {
+      setSelectedUserId(usersList[0].id);
+    }
+  }, [usersList, selectedUserId]);
 
   const handleGoogleLogin = async () => {
     setError('');
@@ -57,21 +69,6 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLoginSuccess }) => {
       }
     } finally {
       setLoading(false);
-    }
-  };
-
-  const getRoleBadge = (role: UserRole) => {
-    switch (role) {
-      case 'coordenador_aluno':
-        return <span className="px-2 py-0.5 text-[11px] font-semibold bg-indigo-100 text-indigo-800 rounded border border-indigo-200">Coordenador Aluno</span>;
-      case 'professor_orientador':
-        return <span className="px-2 py-0.5 text-[11px] font-semibold bg-emerald-100 text-emerald-800 rounded border border-emerald-200">Professor Orientador</span>;
-      case 'professor_colaborador':
-        return <span className="px-2 py-0.5 text-[11px] font-semibold bg-teal-100 text-teal-800 rounded border border-teal-200">Professor Colaborador</span>;
-      case 'aluno':
-        return <span className="px-2 py-0.5 text-[11px] font-semibold bg-sky-100 text-sky-800 rounded border border-sky-200">Aluno</span>;
-      default:
-        return <span className="px-2 py-0.5 text-[11px] font-semibold bg-slate-100 text-slate-700 rounded">{role}</span>;
     }
   };
 
@@ -127,7 +124,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLoginSuccess }) => {
         ...(equipeId ? { equipeId } : {}),
       });
 
-      setSuccessMsg(`Usuário ${res.nome} cadastrado com sucesso!`);
+      setSuccessMsg(`Usuário ${res.nome} cadastrado com sucesso! Redirecionando...`);
       await switchUser(res.id);
       await refreshUsers();
       if (onLoginSuccess) onLoginSuccess();
@@ -181,55 +178,58 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLoginSuccess }) => {
 
       {/* Auth Card */}
       <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
-        {/* Navigation Tabs */}
+        {/* Navigation Tabs: LOGIN | CADASTRO | RECUPERAÇÃO */}
         <div className="flex border-b border-slate-200 bg-slate-50">
           <button
             id="tab-login"
+            type="button"
             onClick={() => {
               setTab('login');
               setError('');
               setSuccessMsg('');
             }}
-            className={`flex-1 py-3.5 text-xs font-bold border-b-2 flex items-center justify-center gap-1.5 transition-colors ${
+            className={`flex-1 py-4 text-xs uppercase font-extrabold tracking-wider border-b-2 flex items-center justify-center gap-2 transition-all ${
               tab === 'login'
-                ? 'border-indigo-600 text-indigo-900 bg-white'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
+                ? 'border-indigo-600 text-indigo-700 bg-white shadow-xs'
+                : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-100/50'
             }`}
           >
-            <LogIn className="w-3.5 h-3.5" />
-            Entrar
+            <LogIn className="w-4 h-4" />
+            LOGIN
           </button>
           <button
             id="tab-register"
+            type="button"
             onClick={() => {
               setTab('register');
               setError('');
               setSuccessMsg('');
             }}
-            className={`flex-1 py-3.5 text-xs font-bold border-b-2 flex items-center justify-center gap-1.5 transition-colors ${
+            className={`flex-1 py-4 text-xs uppercase font-extrabold tracking-wider border-b-2 flex items-center justify-center gap-2 transition-all ${
               tab === 'register'
-                ? 'border-indigo-600 text-indigo-900 bg-white'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
+                ? 'border-indigo-600 text-indigo-700 bg-white shadow-xs'
+                : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-100/50'
             }`}
           >
-            <UserPlus className="w-3.5 h-3.5" />
-            Cadastrar
+            <UserPlus className="w-4 h-4" />
+            CADASTRO
           </button>
           <button
             id="tab-recovery"
+            type="button"
             onClick={() => {
               setTab('recovery');
               setError('');
               setSuccessMsg('');
             }}
-            className={`flex-1 py-3.5 text-xs font-bold border-b-2 flex items-center justify-center gap-1.5 transition-colors ${
+            className={`py-4 px-3 text-[11px] uppercase font-bold tracking-wider border-b-2 flex items-center justify-center gap-1.5 transition-all ${
               tab === 'recovery'
-                ? 'border-indigo-600 text-indigo-900 bg-white'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
+                ? 'border-indigo-600 text-indigo-700 bg-white shadow-xs'
+                : 'border-transparent text-slate-400 hover:text-slate-700'
             }`}
           >
             <KeyRound className="w-3.5 h-3.5" />
-            Recuperação
+            Ajuda
           </button>
         </div>
 
@@ -248,9 +248,9 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLoginSuccess }) => {
             </div>
           )}
 
-          {/* LOGIN FORM */}
+          {/* LOGIN TAB */}
           {tab === 'login' && (
-            <div className="space-y-4">
+            <div className="space-y-5">
               {/* Google Sign-In with Firebase Auth */}
               <div>
                 <button
@@ -258,7 +258,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLoginSuccess }) => {
                   type="button"
                   disabled={loading}
                   onClick={handleGoogleLogin}
-                  className="w-full inline-flex items-center justify-center gap-3 px-4 py-2.5 text-sm font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg shadow-xs transition-colors disabled:opacity-50"
+                  className="w-full inline-flex items-center justify-center gap-3 px-4 py-2.5 text-sm font-bold text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 rounded-xl shadow-xs hover:border-slate-400 transition-all disabled:opacity-50"
                 >
                   <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
                     <path
@@ -286,165 +286,243 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLoginSuccess }) => {
                     <div className="w-full border-t border-slate-200" />
                   </div>
                   <div className="relative flex justify-center text-[11px]">
-                    <span className="bg-white px-2 text-slate-400 font-medium">ou selecione um perfil do projeto</span>
+                    <span className="bg-white px-2 text-slate-400 font-medium">ou acesse com conta institucional</span>
                   </div>
                 </div>
               </div>
 
               <form onSubmit={handleLogin} className="space-y-4">
-              <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
-                <span className="font-semibold text-slate-600">Modo de Autenticação:</span>
-                <div className="flex gap-1.5 bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+                <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
+                  <span className="font-semibold text-slate-600">Modo de Acesso:</span>
+                  <div className="flex gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+                    <button
+                      type="button"
+                      onClick={() => setLoginMethod('select')}
+                      className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all ${
+                        loginMethod === 'select'
+                          ? 'bg-white text-indigo-900 shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Selecionar Perfil
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLoginMethod('email')}
+                      className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all ${
+                        loginMethod === 'email'
+                          ? 'bg-white text-indigo-900 shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Digitar E-mail
+                    </button>
+                  </div>
+                </div>
+
+                {loginMethod === 'select' ? (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                      Perfil Cadastrado no Firestore
+                    </label>
+                    {usersList.length > 0 ? (
+                      <select
+                        id="login-select-user"
+                        value={selectedUserId || usersList[0]?.id}
+                        onChange={(e) => setSelectedUserId(e.target.value)}
+                        className="w-full px-3 py-2.5 text-sm border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-indigo-600 font-medium text-slate-800"
+                      >
+                        {usersList.map((u: Participant) => (
+                          <option key={u.id} value={u.id}>
+                            {u.nome} ({u.email || 'sem email'}) — {u.funcao === 'coordenador_aluno' ? 'Coordenador Aluno' : u.funcao === 'professor_orientador' ? 'Prof. Orientador' : u.funcao === 'professor_colaborador' ? 'Prof. Colaborador' : 'Aluno'}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-600">
+                        Carregando contas cadastradas do Firestore... Se ainda não tiver conta, selecione <strong>Digitar E-mail</strong> ou clique em <strong>CADASTRO</strong>.
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                      E-mail Institucional
+                    </label>
+                    <input
+                      id="login-input-email"
+                      type="email"
+                      required
+                      value={loginEmail}
+                      onChange={(e) => setLoginEmail(e.target.value)}
+                      placeholder="exemplo@universidade.edu.br"
+                      className="w-full px-3 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                    />
+                  </div>
+                )}
+
+                <div className="pt-2">
+                  <button
+                    id="btn-login-submit"
+                    type="submit"
+                    disabled={loading}
+                    className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition-all shadow-sm disabled:opacity-50"
+                  >
+                    <LogIn className="w-4 h-4" />
+                    {loading ? 'Entrando no NexoIF...' : 'Entrar na Conta'}
+                  </button>
+                </div>
+              </form>
+
+              {/* Quick switch to register */}
+              <div className="pt-3 border-t border-slate-100 text-center">
+                <p className="text-xs text-slate-500">
+                  Ainda não possui uma conta?{' '}
                   <button
                     type="button"
-                    onClick={() => setLoginMethod('select')}
-                    className={`px-2 py-0.5 rounded-md text-[11px] font-semibold transition-colors ${
-                      loginMethod === 'select'
-                        ? 'bg-white text-indigo-900 shadow-xs'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
+                    onClick={() => {
+                      setTab('register');
+                      setError('');
+                      setSuccessMsg('');
+                    }}
+                    className="font-bold text-indigo-600 hover:text-indigo-800 hover:underline"
                   >
-                    Selecionar Perfil
+                    Cadastre-se aqui
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setLoginMethod('email')}
-                    className={`px-2 py-0.5 rounded-md text-[11px] font-semibold transition-colors ${
-                      loginMethod === 'email'
-                        ? 'bg-white text-indigo-900 shadow-xs'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    Email Institucional
-                  </button>
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* REGISTER TAB */}
+          {tab === 'register' && (
+            <div className="space-y-4">
+              {/* Google Sign-Up */}
+              <div>
+                <button
+                  id="btn-google-register"
+                  type="button"
+                  disabled={loading}
+                  onClick={handleGoogleLogin}
+                  className="w-full inline-flex items-center justify-center gap-3 px-4 py-2.5 text-sm font-bold text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 rounded-xl shadow-xs hover:border-slate-400 transition-all disabled:opacity-50"
+                >
+                  <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                    <path
+                      fill="#4285F4"
+                      d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"
+                    />
+                    <path
+                      fill="#34A853"
+                      d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.35 24 12 24z"
+                    />
+                    <path
+                      fill="#FBBC05"
+                      d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 10.04 0 12s.45 3.82 1.25 5.42l4.03-3.15z"
+                    />
+                    <path
+                      fill="#EA4335"
+                      d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.35 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
+                    />
+                  </svg>
+                  {loading ? 'Conectando ao Firebase...' : 'Cadastrar com o Google'}
+                </button>
+
+                <div className="relative my-3">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-slate-200" />
+                  </div>
+                  <div className="relative flex justify-center text-[11px]">
+                    <span className="bg-white px-2 text-slate-400 font-medium">ou preencha os dados institucionais</span>
+                  </div>
                 </div>
               </div>
 
-              {loginMethod === 'select' ? (
+              <form onSubmit={handleRegister} className="space-y-3.5">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-                    Selecione o Usuário / Perfil Cadastrado
-                  </label>
-                  <select
-                    id="login-select-user"
-                    value={selectedUserId || (usersList[0]?.id || '')}
-                    onChange={e => setSelectedUserId(e.target.value)}
-                    className="w-full px-3 py-2.5 text-sm border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-600 font-medium text-slate-800"
-                  >
-                    {usersList.map((u: Participant) => (
-                      <option key={u.id} value={u.id}>
-                        {u.nome} — {u.funcao === 'coordenador_aluno' ? 'Coordenador Aluno' : u.funcao === 'professor_orientador' ? 'Prof. Orientador' : u.funcao === 'professor_colaborador' ? 'Prof. Colaborador' : 'Aluno'}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-[11px] text-slate-500 mt-1.5 leading-relaxed">
-                    Permite testar e validar o sistema com as permissões reais de Coordenador Aluno, Professores e Alunos.
-                  </p>
-                </div>
-              ) : (
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-                    Email Institucional
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Nome Completo *
                   </label>
                   <input
-                    id="login-input-email"
+                    id="register-input-nome"
+                    type="text"
+                    required
+                    value={nome}
+                    onChange={(e) => setNome(e.target.value)}
+                    placeholder="Ex: Carlos Eduardo Silva"
+                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    E-mail Institucional *
+                  </label>
+                  <input
+                    id="register-input-email"
                     type="email"
                     required
-                    value={loginEmail}
-                    onChange={e => setLoginEmail(e.target.value)}
-                    placeholder="exemplo@universidade.edu.br"
-                    className="w-full px-3 py-2.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="carlos@universidade.edu.br"
+                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-600"
                   />
-                  <p className="text-[11px] text-slate-500 mt-1.5 leading-relaxed">
-                    Informe o email institucional cadastrado na base de dados do NexoIF.
-                  </p>
                 </div>
-              )}
 
-              <div className="pt-3">
-                <button
-                  id="btn-login-submit"
-                  type="submit"
-                  disabled={loading}
-                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-bold text-white bg-indigo-900 hover:bg-indigo-800 rounded-lg transition-colors shadow-sm disabled:opacity-50"
-                >
-                  <LogIn className="w-4 h-4" />
-                  {loading ? 'Entrando no NexoIF...' : 'Acessar o NexoIF'}
-                </button>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Perfil / Função no Projeto *
+                  </label>
+                  <select
+                    id="register-select-funcao"
+                    value={funcao}
+                    onChange={(e) => setFuncao(e.target.value as UserRole)}
+                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-indigo-600 font-medium text-slate-800"
+                  >
+                    <option value="aluno">Aluno (Desenvolvedor e Pesquisador)</option>
+                    <option value="coordenador_aluno">Coordenador Aluno (Gestão Operacional)</option>
+                    <option value="professor_orientador">Professor Orientador (Supervisão Acadêmica)</option>
+                    <option value="professor_colaborador">Professor Colaborador (Supervisão Técnica)</option>
+                  </select>
+                  <div className="mt-1 flex items-center gap-1.5 text-[11px] text-slate-500">
+                    <Shield className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                    Permissões de acesso são atribuídas conforme a função selecionada.
+                  </div>
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    id="btn-register-submit"
+                    type="submit"
+                    disabled={loading}
+                    className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition-all shadow-sm disabled:opacity-50"
+                  >
+                    <UserPlus className="w-4 h-4" />
+                    {loading ? 'Cadastrando no Firestore...' : 'Concluir Cadastro e Entrar'}
+                  </button>
+                </div>
+              </form>
+
+              {/* Quick switch to login */}
+              <div className="pt-3 border-t border-slate-100 text-center">
+                <p className="text-xs text-slate-500">
+                  Já possui uma conta cadastrada?{' '}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTab('login');
+                      setError('');
+                      setSuccessMsg('');
+                    }}
+                    className="font-bold text-indigo-600 hover:text-indigo-800 hover:underline"
+                  >
+                    Faça login aqui
+                  </button>
+                </p>
               </div>
-            </form>
-          </div>
+            </div>
           )}
 
-          {/* REGISTER FORM */}
-          {tab === 'register' && (
-            <form onSubmit={handleRegister} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Nome Completo *
-                </label>
-                <input
-                  id="register-input-nome"
-                  type="text"
-                  required
-                  value={nome}
-                  onChange={e => setNome(e.target.value)}
-                  placeholder="Ex: Carlos Eduardo Silva"
-                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Email Institucional *
-                </label>
-                <input
-                  id="register-input-email"
-                  type="email"
-                  required
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  placeholder="carlos@universidade.edu.br"
-                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Perfil de Acesso / Função no Projeto *
-                </label>
-                <select
-                  id="register-select-funcao"
-                  value={funcao}
-                  onChange={e => setFuncao(e.target.value as UserRole)}
-                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-600"
-                >
-                  <option value="aluno">Aluno (Desenvolvedor e Pesquisador)</option>
-                  <option value="coordenador_aluno">Coordenador Aluno (Gestão Operacional)</option>
-                  <option value="professor_orientador">Professor Orientador (Supervisão Acadêmica)</option>
-                  <option value="professor_colaborador">Professor Colaborador (Supervisão Técnica)</option>
-                </select>
-                <div className="mt-1.5 flex items-center gap-1.5 text-[11px] text-slate-500">
-                  <Shield className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-                  As permissões internas no NexoIF seguem rigorosamente este perfil.
-                </div>
-              </div>
-
-              <div className="pt-2">
-                <button
-                  id="btn-register-submit"
-                  type="submit"
-                  disabled={loading}
-                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-bold text-white bg-indigo-900 hover:bg-indigo-800 rounded-lg transition-colors shadow-sm disabled:opacity-50"
-                >
-                  <UserPlus className="w-4 h-4" />
-                  {loading ? 'Cadastrando...' : 'Cadastrar e Entrar'}
-                </button>
-              </div>
-            </form>
-          )}
-
-          {/* RECOVERY FORM */}
+          {/* RECOVERY TAB */}
           {tab === 'recovery' && (
             <div className="space-y-4">
               <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-xl space-y-2 text-xs text-indigo-900">
@@ -457,9 +535,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLoginSuccess }) => {
                 </p>
                 <div className="bg-white/80 p-3 rounded-lg border border-indigo-100 text-[11px] space-y-1">
                   <p><strong>Contatos de Suporte:</strong></p>
-                  <p>• Coordenador Aluno: <code>lucas.mendes@universidade.edu.br</code></p>
-                  <p>• Professor Orientador: <code>alexandre.silva@universidade.edu.br</code></p>
-                  <p>• Professor Colaborador: <code>beatriz.ferreira@universidade.edu.br</code></p>
+                  <p>• Coordenador Aluno: <code>paulocauan39@gmail.com</code></p>
                 </div>
               </div>
 
@@ -470,7 +546,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLoginSuccess }) => {
                     Solicitação enviada com sucesso!
                   </div>
                   <p>
-                    Uma notificação institucional foi registrada para <strong>{recoveryEmail}</strong>. Verifique sua caixa postal ou aguarde a confirmação do Coordenador Aluno.
+                    Uma notificação institucional foi registrada para <strong>{recoveryEmail}</strong>. Verifique sua caixa postal ou aguarde a confirmação.
                   </p>
                   <button
                     type="button"
@@ -494,15 +570,15 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLoginSuccess }) => {
                       type="email"
                       required
                       value={recoveryEmail}
-                      onChange={e => setRecoveryEmail(e.target.value)}
+                      onChange={(e) => setRecoveryEmail(e.target.value)}
                       placeholder="seu.email@universidade.edu.br"
-                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-600"
                     />
                   </div>
                   <button
                     id="btn-recovery-submit"
                     type="submit"
-                    className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-bold text-indigo-900 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg transition-colors"
+                    className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-bold text-indigo-900 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-xl transition-colors"
                   >
                     <KeyRound className="w-4 h-4" />
                     Solicitar Instruções de Acesso
@@ -521,3 +597,4 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLoginSuccess }) => {
     </div>
   );
 };
+

@@ -203,13 +203,8 @@ const MainLayout: React.FC = () => {
     );
   }
 
-  // First-time setup screen (First User)
-  if (needsSetup) {
-    return <InitialSetup onSetupCompleted={refreshAuth} />;
-  }
-
   // Mandatory Authentication Enforcement:
-  // Unauthenticated users ONLY see login/registration/recovery. Zero internal system data is shown.
+  // Unauthenticated users ALWAYS see full authentication view (Login, Cadastro, Google Auth). Zero internal system data is exposed without authentication.
   if (!currentUser) {
     return (
       <AuthView
