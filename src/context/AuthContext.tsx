@@ -333,21 +333,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [currentUser]);
 
-  const isAdmin = Boolean(
-    currentUser?.funcao === 'admin' ||
-    currentUser?.isAdmin === true ||
-    currentUser?.roles?.includes('admin') ||
-    currentUser?.email?.toLowerCase() === 'paulocauan39@gmail.com'
-  );
+  const isUserAdmin = isAdmin(currentUser);
   const isCoordenadorAluno = Boolean(currentUser?.funcao === 'coordenador_aluno' || currentUser?.roles?.includes('coordenador_aluno'));
   const isProfessorOrientador = currentUser?.funcao === 'professor_orientador';
   const isProfessorColaborador = currentUser?.funcao === 'professor_colaborador';
   const isAluno = currentUser?.funcao === 'aluno';
 
   // Administrador tem poderes de gestão total sobre todos os módulos
-  const canManageAdmin = isAdmin || isCoordenadorAluno;
-  const canRegisterExperiments = isAdmin || isCoordenadorAluno || isAluno;
-  const canSubmitEvaluations = isAdmin || isCoordenadorAluno || isAluno;
+  const canManageAdmin = isUserAdmin || isCoordenadorAluno;
+  const canRegisterExperiments = isUserAdmin || isCoordenadorAluno || isAluno;
+  const canSubmitEvaluations = isUserAdmin || isCoordenadorAluno || isAluno;
 
   return (
     <AuthContext.Provider
@@ -366,7 +361,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         refreshAuth: refreshUsers,
         setupInitialUser,
         roleLabel,
-        isAdmin,
+        isAdmin: isUserAdmin,
         isCoordenadorAluno,
         isProfessorOrientador,
         isProfessorColaborador,
@@ -379,6 +374,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       {children}
     </AuthContext.Provider>
   );
+}
+
+/**
+ * Helper function that identifies users with 'admin' access.
+ * Checks specifically for 'paulocauan39@gmail.com', 'admin' in roles array,
+ * isAdmin / admin boolean flags, or funcao / role === 'admin'.
+ */
+export function isAdmin(
+  user?:
+    | Participant
+    | {
+        id?: string;
+        email?: string | null;
+        funcao?: UserRole | string;
+        role?: string;
+        isAdmin?: boolean;
+        admin?: boolean;
+        roles?: (UserRole | string)[];
+      }
+    | null
+    | undefined
+): boolean {
+  if (!user) return false;
+  const email = (user.email || '').toLowerCase().trim();
+  if (email === 'paulocauan39@gmail.com') return true;
+  if (user.isAdmin === true || (user as any).admin === true) return true;
+  if (user.funcao === 'admin' || (user as any).role === 'admin') return true;
+  if (Array.isArray(user.roles) && user.roles.includes('admin' as any)) return true;
+  return false;
 }
 
 export function useAuth() {
