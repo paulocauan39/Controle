@@ -55,7 +55,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (user && user.email) {
         setIsLoading(true);
         try {
-          // 1. Fetch participant profile if any from Firestore
+          // 1. Check custom claims from Firebase Auth token
+          let hasAdminClaim = false;
+          try {
+            const tokenResult = await user.getIdTokenResult();
+            hasAdminClaim = Boolean(
+              tokenResult?.claims?.admin === true ||
+              tokenResult?.claims?.role === 'admin' ||
+              tokenResult?.claims?.isAdmin === true
+            );
+          } catch (claimErr) {
+            console.warn('[AuthFlow] Token claims inspection notice:', claimErr);
+          }
+
+          // 2. Fetch participant profile if any from Firestore
           let firestoreParticipant: Participant | null = null;
           try {
             console.log('[AuthFlow] 2. Starting Firestore fetch for user profile...', { uid: user.uid, email: user.email });
@@ -66,8 +79,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
 
           if (isMounted) {
-            const isPaulo = (user.email || '').toLowerCase() === 'paulocauan39@gmail.com';
-            const isAdminUser = firestoreParticipant?.funcao === 'admin' || firestoreParticipant?.isAdmin === true || firestoreParticipant?.roles?.includes('admin') || isPaulo;
+            const isPaulo = (user.email || '').toLowerCase().trim() === 'paulocauan39@gmail.com';
+            const hasAdminDocField = Boolean(
+              firestoreParticipant?.funcao === 'admin' ||
+              firestoreParticipant?.isAdmin === true ||
+              (firestoreParticipant as any)?.admin === true ||
+              (firestoreParticipant as any)?.role === 'admin' ||
+              firestoreParticipant?.roles?.includes('admin')
+            );
+            const isAdminUser = hasAdminClaim || hasAdminDocField || isPaulo;
+
+            const existingRoles = firestoreParticipant?.roles || [firestoreParticipant?.funcao || (isPaulo ? 'coordenador_aluno' : 'aluno')];
+            const finalRoles = isAdminUser && !existingRoles.includes('admin') ? [...existingRoles, 'admin' as UserRole] : existingRoles;
 
             const finalParticipant: Participant = {
               id: firestoreParticipant?.id || user.uid,
@@ -75,7 +98,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               email: user.email,
               funcao: firestoreParticipant?.funcao || (isPaulo ? 'coordenador_aluno' : 'aluno'),
               isAdmin: isAdminUser,
-              roles: firestoreParticipant?.roles || (isAdminUser ? [firestoreParticipant?.funcao || 'coordenador_aluno', 'admin'] : [firestoreParticipant?.funcao || 'aluno']),
+              roles: finalRoles,
               status: firestoreParticipant?.status || 'Ativo',
               dataEntrada: firestoreParticipant?.dataEntrada || new Date().toISOString().split('T')[0],
               createdAt: firestoreParticipant?.createdAt || new Date().toISOString(),
@@ -183,7 +206,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       console.log('[AuthFlow] signInWithGoogle popup success:', { uid: fbUser.uid, email: fbUser.email });
 
-      // Check Firestore document
+      // Check custom claims & Firestore document
+      let hasAdminClaim = false;
+      try {
+        const tokenResult = await fbUser.getIdTokenResult();
+        hasAdminClaim = Boolean(
+          tokenResult?.claims?.admin === true ||
+          tokenResult?.claims?.role === 'admin' ||
+          tokenResult?.claims?.isAdmin === true
+        );
+      } catch (claimErr) {
+        console.warn('[AuthFlow] Token claims inspection notice in signInWithGoogle:', claimErr);
+      }
+
       let firestoreParticipant: Participant | null = null;
       try {
         console.log('[AuthFlow] Starting Firestore fetch in signInWithGoogle...', { uid: fbUser.uid, email: fbUser.email });
@@ -193,8 +228,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.warn('[AuthFlow] Firestore fetch error in signInWithGoogle:', fErr?.code || fErr?.message || fErr);
       }
 
-      const isPaulo = (fbUser.email || '').toLowerCase() === 'paulocauan39@gmail.com';
-      const isAdminUser = firestoreParticipant?.funcao === 'admin' || firestoreParticipant?.isAdmin === true || firestoreParticipant?.roles?.includes('admin') || isPaulo;
+      const isPaulo = (fbUser.email || '').toLowerCase().trim() === 'paulocauan39@gmail.com';
+      const hasAdminDocField = Boolean(
+        firestoreParticipant?.funcao === 'admin' ||
+        firestoreParticipant?.isAdmin === true ||
+        (firestoreParticipant as any)?.admin === true ||
+        (firestoreParticipant as any)?.role === 'admin' ||
+        firestoreParticipant?.roles?.includes('admin')
+      );
+      const isAdminUser = hasAdminClaim || hasAdminDocField || isPaulo;
+
+      const existingRoles = firestoreParticipant?.roles || [firestoreParticipant?.funcao || (isPaulo ? 'coordenador_aluno' : 'aluno')];
+      const finalRoles = isAdminUser && !existingRoles.includes('admin') ? [...existingRoles, 'admin' as UserRole] : existingRoles;
 
       const finalParticipant: Participant = {
         id: firestoreParticipant?.id || fbUser.uid,
@@ -202,7 +247,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email: fbUser.email,
         funcao: firestoreParticipant?.funcao || (isPaulo ? 'coordenador_aluno' : 'aluno'),
         isAdmin: isAdminUser,
-        roles: firestoreParticipant?.roles || (isAdminUser ? [firestoreParticipant?.funcao || 'coordenador_aluno', 'admin'] : [firestoreParticipant?.funcao || 'aluno']),
+        roles: finalRoles,
         status: firestoreParticipant?.status || 'Ativo',
         dataEntrada: firestoreParticipant?.dataEntrada || new Date().toISOString().split('T')[0],
         createdAt: firestoreParticipant?.createdAt || new Date().toISOString(),

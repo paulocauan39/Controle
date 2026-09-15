@@ -27,13 +27,17 @@ service cloud.firestore {
     function isAdmin() {
       return isSignedIn() && (
         request.auth.token.email == 'paulocauan39@gmail.com' ||
+        (request.auth.token.keys().hasAny(['admin']) && request.auth.token.admin == true) ||
+        (request.auth.token.keys().hasAny(['role']) && request.auth.token.role == 'admin') ||
         exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
         (exists(/databases/$(database)/documents/participants/$(request.auth.uid)) &&
          (get(/databases/$(database)/documents/participants/$(request.auth.uid)).data.funcao == 'admin' ||
-          get(/databases/$(database)/documents/participants/$(request.auth.uid)).data.isAdmin == true)) ||
+          get(/databases/$(database)/documents/participants/$(request.auth.uid)).data.isAdmin == true ||
+          get(/databases/$(database)/documents/participants/$(request.auth.uid)).data.admin == true)) ||
         (exists(/databases/$(database)/documents/usuarios/$(request.auth.uid)) &&
          (get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.funcao == 'admin' ||
-          get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.isAdmin == true))
+          get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.isAdmin == true ||
+          get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.admin == true))
       );
     }
 
@@ -48,8 +52,7 @@ service cloud.firestore {
 
     match /participants/{participantId} {
       allow read: if isSignedIn();
-      allow create: if isSignedIn() && isValidId(participantId) && isValidParticipant(incoming());
-      allow update: if isSignedIn() && isValidId(participantId) && isValidParticipant(incoming());
+      allow create, update: if isAdmin() || (isSignedIn() && isValidId(participantId) && isValidParticipant(incoming()));
       allow delete: if isAdmin();
     }
 
@@ -60,20 +63,14 @@ service cloud.firestore {
         isAdmin() ||
         (resource != null && resource.data.email == request.auth.token.email) ||
         (exists(/databases/$(database)/documents/participants/$(request.auth.uid)) &&
-         get(/databases/$(database)/documents/participants/$(request.auth.uid)).data.funcao in ['coordenador_aluno', 'professor_orientador']) ||
+         get(/databases/$(database)/documents/participants/$(request.auth.uid)).data.funcao in ['admin', 'coordenador_aluno', 'professor_orientador']) ||
         (exists(/databases/$(database)/documents/usuarios/$(request.auth.uid)) &&
-         get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.funcao in ['coordenador_aluno', 'professor_orientador'])
+         get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.funcao in ['admin', 'coordenador_aluno', 'professor_orientador'])
       );
-      allow create: if isSignedIn() && (
+      allow create, update: if isAdmin() || (isSignedIn() && (
         request.auth.uid == usuarioId ||
-        (incoming().email is string && incoming().email == request.auth.token.email) ||
-        isAdmin()
-      );
-      allow update: if isSignedIn() && (
-        request.auth.uid == usuarioId ||
-        (incoming().email is string && incoming().email == request.auth.token.email) ||
-        isAdmin()
-      );
+        (incoming().email is string && incoming().email == request.auth.token.email)
+      ));
       allow delete: if isAdmin();
     }
 
@@ -87,7 +84,7 @@ service cloud.firestore {
 
     match /teams/{teamId} {
       allow read: if isSignedIn();
-      allow create, update: if isSignedIn() && isValidId(teamId) && isValidTeam(incoming());
+      allow create, update: if isAdmin() || (isSignedIn() && isValidId(teamId) && isValidTeam(incoming()));
       allow delete: if isAdmin();
     }
 
@@ -101,7 +98,7 @@ service cloud.firestore {
 
     match /games/{gameId} {
       allow read: if isSignedIn();
-      allow create, update: if isSignedIn() && isValidId(gameId) && isValidGame(incoming());
+      allow create, update: if isAdmin() || (isSignedIn() && isValidId(gameId) && isValidGame(incoming()));
       allow delete: if isAdmin();
     }
 
@@ -119,8 +116,8 @@ service cloud.firestore {
 
     match /tasks/{taskId} {
       allow read: if isSignedIn();
-      allow create, update: if isSignedIn() && isValidId(taskId) && isValidTask(incoming());
-      allow delete: if isSignedIn();
+      allow create, update: if isAdmin() || (isSignedIn() && isValidId(taskId) && isValidTask(incoming()));
+      allow delete: if isAdmin() || isSignedIn();
     }
 
     // AIs validation
@@ -133,7 +130,7 @@ service cloud.firestore {
 
     match /ais/{aiId} {
       allow read: if isSignedIn();
-      allow create, update: if isSignedIn() && isValidId(aiId) && isValidAI(incoming());
+      allow create, update: if isAdmin() || (isSignedIn() && isValidId(aiId) && isValidAI(incoming()));
       allow delete: if isAdmin();
     }
 
@@ -149,8 +146,8 @@ service cloud.firestore {
 
     match /experiments/{experimentId} {
       allow read: if isSignedIn();
-      allow create, update: if isSignedIn() && isValidId(experimentId) && isValidExperiment(incoming());
-      allow delete: if isSignedIn();
+      allow create, update: if isAdmin() || (isSignedIn() && isValidId(experimentId) && isValidExperiment(incoming()));
+      allow delete: if isAdmin() || isSignedIn();
     }
 
     // Prompts validation
@@ -163,8 +160,8 @@ service cloud.firestore {
 
     match /prompts/{promptId} {
       allow read: if isSignedIn();
-      allow create, update: if isSignedIn() && isValidId(promptId) && isValidPrompt(incoming());
-      allow delete: if isSignedIn();
+      allow create, update: if isAdmin() || (isSignedIn() && isValidId(promptId) && isValidPrompt(incoming()));
+      allow delete: if isAdmin() || isSignedIn();
     }
 
     // Prompt Categories (Administrative Module)
@@ -176,7 +173,7 @@ service cloud.firestore {
 
     match /promptCategories/{categoryId} {
       allow read: if isSignedIn();
-      allow create, update, delete: if isSignedIn() && isValidId(categoryId) && isValidPromptCategory(incoming());
+      allow create, update, delete: if isAdmin() || (isSignedIn() && isValidId(categoryId) && isValidPromptCategory(incoming()));
     }
 
     // Project Documents (Documentation Module)
@@ -192,25 +189,28 @@ service cloud.firestore {
 
     match /documents/{documentId} {
       allow read: if isSignedIn();
-      allow create, update: if isSignedIn() && isValidId(documentId) && isValidDocument(incoming());
-      allow delete: if isSignedIn();
+      allow create, update: if isAdmin() || (isSignedIn() && isValidId(documentId) && isValidDocument(incoming()));
+      allow delete: if isAdmin() || isSignedIn();
     }
 
     // Audit Logs (Global Logger)
     function isValidAudit(data) {
       return data.id is string && isValidId(data.id) &&
-        data.usuarioId is string && isValidId(data.usuarioId) &&
-        data.acao is string && data.acao.size() <= 100 &&
-        data.registroAfetado is string && data.registroAfetado.size() <= 200 &&
-        data.tipoEntidade is string && data.tipoEntidade.size() <= 100 &&
-        data.entidadeId is string && isValidId(data.entidadeId) &&
-        data.timestamp is number;
+        data.usuarioId is string &&
+        data.acao is string &&
+        data.timestamp != null;
     }
 
     match /auditLogs/{logId} {
       allow read: if isSignedIn();
-      allow create: if isSignedIn() && isValidId(logId) && isValidAudit(incoming());
-      allow update, delete: if false; // Immutable audit trail
+      allow create: if isSignedIn() && (isAdmin() || isValidAudit(incoming()));
+      allow update, delete: if isAdmin();
+    }
+
+    match /audit_logs/{logId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && (isAdmin() || isValidAudit(incoming()));
+      allow update, delete: if isAdmin();
     }
   }
 }

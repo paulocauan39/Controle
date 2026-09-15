@@ -2,11 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../services/api.js';
 import { Participant, Team, UserRole } from '../types.js';
 import { useAuth } from '../context/AuthContext.js';
+import { useAdminAudit } from '../hooks/useAdminAudit.js';
+import { isAdmin as checkIsAdmin } from '../utils/admin.js';
 import { EmptyState } from './EmptyState.js';
 import { Plus, UserX, Edit2, CheckCircle2, XCircle, Trash2, ShieldAlert, AlertTriangle } from 'lucide-react';
 
 export const ParticipantsView: React.FC = () => {
   const { canManageAdmin, isAdmin, currentUser, refreshUsers } = useAuth();
+  const { logDeletion, logEdit } = useAdminAudit();
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);
@@ -96,8 +99,9 @@ export const ParticipantsView: React.FC = () => {
           status,
           dataEntrada,
         });
+        await logEdit('Participantes', editingParticipant.id, nome.trim(), `Participante ${nome.trim()} (${funcao}) atualizado.`);
       } else {
-        await api.createParticipant({
+        const created = await api.createParticipant({
           nome: nome.trim(),
           email: email.trim(),
           funcao,
@@ -105,6 +109,7 @@ export const ParticipantsView: React.FC = () => {
           status,
           dataEntrada,
         });
+        await logEdit('Participantes', created?.id || 'new', nome.trim(), `Novo participante ${nome.trim()} (${funcao}) cadastrado.`);
       }
 
       setModalOpen(false);
@@ -124,6 +129,7 @@ export const ParticipantsView: React.FC = () => {
 
     try {
       await api.deactivateParticipant(p.id);
+      await logEdit('Participantes', p.id, p.nome, `Participante ${p.nome} alterado para status Inativo.`);
       await loadData();
       await refreshUsers();
     } catch (err: any) {
@@ -153,6 +159,7 @@ export const ParticipantsView: React.FC = () => {
       setIsDeleting(true);
       setDeleteError('');
       await api.deleteParticipant(participantToDelete.id);
+      await logDeletion('Participantes', participantToDelete.id, participantToDelete.nome, `Participante ${participantToDelete.nome} (${participantToDelete.email}) excluído permanentemente.`);
       setDeleteModalOpen(false);
       setParticipantToDelete(null);
       await loadData();

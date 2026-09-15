@@ -8,7 +8,7 @@
         "id": { "type": "string", "maxLength": 128 },
         "nome": { "type": "string", "maxLength": 200 },
         "email": { "type": "string", "format": "email", "maxLength": 200 },
-        "funcao": { "type": "string", "enum": ["coordenador_aluno", "professor_orientador", "professor_colaborador", "aluno"] },
+        "funcao": { "type": "string", "enum": ["admin", "coordenador_aluno", "professor_orientador", "professor_colaborador", "aluno"] },
         "equipeId": { "type": "string", "maxLength": 128 },
         "equipeNome": { "type": "string", "maxLength": 200 },
         "status": { "type": "string", "enum": ["Ativo", "Inativo"] },
@@ -239,6 +239,10 @@
     "/auditLogs/{logId}": {
       "schema": "AuditLog",
       "description": "Logs de auditoria e histórico de atividades"
+    },
+    "/audit_logs/{logId}": {
+      "schema": "AuditLog",
+      "description": "Coleção dedicada de auditoria de operações administrativas"
     }
   }
 }

@@ -2,11 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../services/api.js';
 import { Team, Participant } from '../types.js';
 import { useAuth } from '../context/AuthContext.js';
+import { useAdminAudit } from '../hooks/useAdminAudit.js';
+import { isAdmin as checkIsAdmin } from '../utils/admin.js';
 import { EmptyState } from './EmptyState.js';
 import { Plus, Edit2, Trash2, Users } from 'lucide-react';
 
 export const TeamsView: React.FC = () => {
-  const { canManageAdmin } = useAuth();
+  const { canManageAdmin, currentUser } = useAuth();
+  const { logDeletion, logEdit } = useAdminAudit();
   const [teams, setTeams] = useState<Team[]>([]);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [loading, setLoading] = useState(true);
@@ -89,8 +92,9 @@ export const TeamsView: React.FC = () => {
           areaAtuacao: areaAtuacao.trim(),
           status,
         });
+        await logEdit('Equipes', editingTeam.id, nome.trim(), `Equipe "${nome.trim()}" atualizada.`);
       } else {
-        await api.createTeam({
+        const created = await api.createTeam({
           nome: nome.trim(),
           descricao: descricao.trim(),
           responsavelId,
@@ -98,6 +102,7 @@ export const TeamsView: React.FC = () => {
           areaAtuacao: areaAtuacao.trim(),
           status,
         });
+        await logEdit('Equipes', created?.id || 'new', nome.trim(), `Nova equipe "${nome.trim()}" criada.`);
       }
 
       setModalOpen(false);
@@ -114,6 +119,7 @@ export const TeamsView: React.FC = () => {
 
     try {
       await api.deleteTeam(t.id);
+      await logDeletion('Equipes', t.id, t.nome, `Equipe "${t.nome}" excluída permanentemente.`);
       await loadData();
     } catch (err: any) {
       alert(err.message || 'Erro ao excluir equipe.');

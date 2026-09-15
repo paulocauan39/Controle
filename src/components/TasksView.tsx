@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../services/api.js';
 import { Task, TaskPriority, TaskStatus, Participant, Team, Game } from '../types.js';
 import { useAuth } from '../context/AuthContext.js';
+import { useAdminAudit } from '../hooks/useAdminAudit.js';
+import { isAdmin as checkIsAdmin } from '../utils/admin.js';
 import { EmptyState } from './EmptyState.js';
 import {
   Plus,
@@ -17,6 +19,7 @@ import {
 
 export const TasksView: React.FC = () => {
   const { currentUser, canManageAdmin, isAluno } = useAuth();
+  const { logDeletion, logEdit } = useAdminAudit();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
@@ -138,8 +141,10 @@ export const TasksView: React.FC = () => {
 
       if (editingTask) {
         await api.updateTask(editingTask.id, payload);
+        await logEdit('Tarefas', editingTask.id, titulo.trim(), `Tarefa "${titulo.trim()}" atualizada (${status}, ${prioridade}).`);
       } else {
-        await api.createTask(payload);
+        const created = await api.createTask(payload);
+        await logEdit('Tarefas', created?.id || 'new', titulo.trim(), `Nova tarefa "${titulo.trim()}" criada (${status}, ${prioridade}).`);
       }
 
       setModalOpen(false);
@@ -162,6 +167,7 @@ export const TasksView: React.FC = () => {
 
     try {
       await api.updateTaskStatus(task.id, newStatus);
+      await logEdit('Tarefas', task.id, task.titulo, `Status alterado para "${newStatus}".`);
       await loadData();
     } catch (err: any) {
       alert(err.message || 'Erro ao atualizar status da tarefa.');
@@ -186,6 +192,7 @@ export const TasksView: React.FC = () => {
         completionDateInput.trim(),
         completionNotesInput.trim() || undefined
       );
+      await logEdit('Tarefas', completionModalTask.id, completionModalTask.titulo, `Tarefa concluída em ${completionDateInput.trim()}.`);
       setCompletionModalTask(null);
       await loadData();
     } catch (err: any) {
@@ -199,6 +206,7 @@ export const TasksView: React.FC = () => {
     if (!confirm(`Deseja excluir a tarefa "${t.titulo}"?`)) return;
     try {
       await api.deleteTask(t.id);
+      await logDeletion('Tarefas', t.id, t.titulo, `Tarefa "${t.titulo}" excluída permanentemente.`);
       await loadData();
     } catch (err: any) {
       alert(err.message || 'Erro ao excluir tarefa.');
