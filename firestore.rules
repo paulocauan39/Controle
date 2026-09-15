@@ -58,19 +58,8 @@ service cloud.firestore {
 
     // Usuarios collection (Firebase Auth user profile mapping)
     match /usuarios/{usuarioId} {
-      allow read: if isSignedIn() && (
-        request.auth.uid == usuarioId ||
-        isAdmin() ||
-        (resource != null && resource.data.email == request.auth.token.email) ||
-        (exists(/databases/$(database)/documents/participants/$(request.auth.uid)) &&
-         get(/databases/$(database)/documents/participants/$(request.auth.uid)).data.funcao in ['admin', 'coordenador_aluno', 'professor_orientador']) ||
-        (exists(/databases/$(database)/documents/usuarios/$(request.auth.uid)) &&
-         get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.funcao in ['admin', 'coordenador_aluno', 'professor_orientador'])
-      );
-      allow create, update: if isAdmin() || (isSignedIn() && (
-        request.auth.uid == usuarioId ||
-        (incoming().email is string && incoming().email == request.auth.token.email)
-      ));
+      allow read: if isSignedIn();
+      allow create, update: if isAdmin() || isSignedIn();
       allow delete: if isAdmin();
     }
 

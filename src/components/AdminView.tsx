@@ -78,56 +78,127 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToTab }) => {
 
   const isCurrentAdmin = checkIsAdmin(currentUser);
 
-  // Direct onSnapshot listeners on Firestore collections
+  // Direct onSnapshot listeners on Firestore collections (Real-time sync for usuarios and participants)
   useEffect(() => {
     setLoading(true);
 
-    // 1. Direct real-time listener on 'usuarios' collection by UID
-    const unsubscribeUsers = onSnapshot(
+    let usuariosDocs: any[] = [];
+    let participantsDocs: any[] = [];
+
+    const mergeAndSetUsers = () => {
+      const map = new Map<string, Participant>();
+
+      // 1. Process /participants docs
+      participantsDocs.forEach((d) => {
+        const data = d.data() || {};
+        const email = (data.email || '').trim();
+        const isPaulo = email.toLowerCase() === 'paulocauan39@gmail.com';
+        const hasAdminRole = Boolean(
+          isPaulo ||
+          data.isAdmin === true ||
+          data.admin === true ||
+          data.funcao === 'admin' ||
+          data.perfil === 'admin' ||
+          data.role === 'admin' ||
+          data.roles?.includes('admin')
+        );
+
+        const item: Participant = {
+          id: d.id || data.id,
+          nome: data.nome || data.displayName || data.name || (email ? email.split('@')[0] : 'Participante'),
+          email: email,
+          funcao: (data.funcao || data.perfil || data.role || (isPaulo ? 'coordenador_aluno' : 'aluno')) as UserRole,
+          isAdmin: hasAdminRole,
+          roles: data.roles || (hasAdminRole ? ['coordenador_aluno', 'admin'] : [data.funcao || 'aluno']),
+          status: (data.status as 'Ativo' | 'Inativo') || 'Ativo',
+          dataEntrada: data.dataEntrada || (data.createdAt ? String(data.createdAt).split('T')[0] : new Date().toISOString().split('T')[0]),
+          createdAt: data.createdAt || new Date().toISOString(),
+          ...(data.equipeId ? { equipeId: data.equipeId } : {}),
+          ...(data.equipeNome ? { equipeNome: data.equipeNome } : {}),
+        };
+
+        const key = (email || item.id).toLowerCase();
+        map.set(key, item);
+      });
+
+      // 2. Process /usuarios docs (merge or add)
+      usuariosDocs.forEach((d) => {
+        const data = d.data() || {};
+        const uid = d.id;
+        const email = (data.email || '').trim();
+        const emailKey = (email || uid).toLowerCase();
+        const existing = map.get(emailKey) || map.get(uid.toLowerCase());
+        const isPaulo = email.toLowerCase() === 'paulocauan39@gmail.com';
+        const hasAdminRole = Boolean(
+          isPaulo ||
+          existing?.isAdmin === true ||
+          data.isAdmin === true ||
+          data.admin === true ||
+          data.funcao === 'admin' ||
+          data.perfil === 'admin' ||
+          data.role === 'admin' ||
+          data.roles?.includes('admin')
+        );
+
+        const item: Participant = {
+          id: existing?.id || uid,
+          nome: existing?.nome || data.nome || data.displayName || data.name || (email ? email.split('@')[0] : 'Usuário'),
+          email: existing?.email || email,
+          funcao: (existing?.funcao || data.funcao || data.perfil || data.role || (isPaulo ? 'coordenador_aluno' : 'aluno')) as UserRole,
+          isAdmin: hasAdminRole,
+          roles: existing?.roles || data.roles || (hasAdminRole ? ['coordenador_aluno', 'admin'] : [data.funcao || 'aluno']),
+          status: existing?.status || (data.status as 'Ativo' | 'Inativo') || 'Ativo',
+          dataEntrada: existing?.dataEntrada || data.dataEntrada || (data.createdAt ? String(data.createdAt).split('T')[0] : new Date().toISOString().split('T')[0]),
+          createdAt: existing?.createdAt || data.createdAt || new Date().toISOString(),
+          equipeId: existing?.equipeId || data.equipeId || undefined,
+          equipeNome: existing?.equipeNome || data.equipeNome || undefined,
+        };
+
+        map.set(emailKey, item);
+      });
+
+      const usersList = Array.from(map.values());
+      usersList.sort((a, b) => a.nome.localeCompare(b.nome));
+
+      console.log('[AdminView:Diagnostic] Sincronização em tempo real Firestore:', {
+        usuariosCount: usuariosDocs.length,
+        participantsCount: participantsDocs.length,
+        totalMerged: usersList.length,
+        docIds: usersList.map((u) => u.id),
+        emails: usersList.map((u) => u.email),
+      });
+
+      setParticipants(usersList);
+      setLoading(false);
+    };
+
+    // 1. Real-time listener on 'usuarios' collection
+    const unsubscribeUsuarios = onSnapshot(
       collection(db, 'usuarios'),
       (snapshot) => {
-        const usersList: Participant[] = snapshot.docs.map((docSnap) => {
-          const data = docSnap.data() || {};
-          const uid = docSnap.id;
-          const email = (data.email || '').trim();
-          const isPaulo = email.toLowerCase() === 'paulocauan39@gmail.com';
-          const hasAdminRole = Boolean(
-            isPaulo ||
-            data.isAdmin === true ||
-            data.admin === true ||
-            data.funcao === 'admin' ||
-            data.perfil === 'admin' ||
-            data.role === 'admin' ||
-            data.roles?.includes('admin')
-          );
-
-          return {
-            id: uid, // UID from document ID
-            nome: data.nome || data.displayName || data.name || (email ? email.split('@')[0] : 'Usuário'),
-            email: email,
-            funcao: (data.funcao || data.perfil || data.role || (isPaulo ? 'coordenador_aluno' : 'aluno')) as UserRole,
-            isAdmin: hasAdminRole,
-            roles: data.roles || (hasAdminRole ? ['admin'] : ['aluno']),
-            equipeId: data.equipeId || undefined,
-            equipeNome: data.equipeNome || undefined,
-            status: (data.status as 'Ativo' | 'Inativo') || 'Ativo',
-            dataEntrada: data.dataEntrada || (data.createdAt ? String(data.createdAt).split('T')[0] : new Date().toISOString().split('T')[0]),
-            createdAt: data.createdAt || new Date().toISOString(),
-          };
-        });
-
-        // Sort by name
-        usersList.sort((a, b) => a.nome.localeCompare(b.nome));
-        setParticipants(usersList);
-        setLoading(false);
+        usuariosDocs = snapshot.docs;
+        mergeAndSetUsers();
       },
       (err) => {
         console.error('[AdminView] Erro no listener onSnapshot /usuarios:', err);
-        setLoading(false);
+        mergeAndSetUsers();
       }
     );
 
-    // 2. Direct real-time listener on 'audit_logs' collection
+    // 2. Real-time listener on 'participants' collection
+    const unsubscribeParticipants = onSnapshot(
+      collection(db, 'participants'),
+      (snapshot) => {
+        participantsDocs = snapshot.docs;
+        mergeAndSetUsers();
+      },
+      (err) => {
+        console.error('[AdminView] Erro no listener onSnapshot /participants:', err);
+        mergeAndSetUsers();
+      }
+    );
+
+    // 3. Direct real-time listener on 'audit_logs' collection
     const unsubscribeAudit = onSnapshot(
       collection(db, 'audit_logs'),
       (snapshot) => {
@@ -145,7 +216,7 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToTab }) => {
       }
     );
 
-    // 3. Real-time listener on 'teams' collection
+    // 4. Real-time listener on 'teams' collection
     const unsubscribeTeams = onSnapshot(
       collection(db, 'teams'),
       (snapshot) => {
@@ -160,7 +231,7 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToTab }) => {
       }
     );
 
-    // 4. Real-time listener on 'tasks' collection
+    // 5. Real-time listener on 'tasks' collection
     const unsubscribeTasks = onSnapshot(
       collection(db, 'tasks'),
       (snapshot) => {
@@ -175,7 +246,7 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToTab }) => {
       }
     );
 
-    // 5. Real-time listener on 'games' collection
+    // 6. Real-time listener on 'games' collection
     const unsubscribeGames = onSnapshot(
       collection(db, 'games'),
       (snapshot) => {
@@ -191,7 +262,8 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToTab }) => {
     );
 
     return () => {
-      unsubscribeUsers();
+      unsubscribeUsuarios();
+      unsubscribeParticipants();
       unsubscribeAudit();
       unsubscribeTeams();
       unsubscribeTasks();
@@ -202,12 +274,18 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToTab }) => {
   // Filtered Participants based on search query and role filter
   const filteredParticipants = useMemo(() => {
     return participants.filter((p) => {
-      const matchRole = userRoleFilter === 'todos' || p.funcao === userRoleFilter;
+      const isPaulo = (p.email || '').toLowerCase().trim() === 'paulocauan39@gmail.com';
+      const hasAdminRole = Boolean(p.isAdmin || p.funcao === 'admin' || isPaulo);
+      const matchRole =
+        userRoleFilter === 'todos' ||
+        p.funcao === userRoleFilter ||
+        (userRoleFilter === 'admin' && hasAdminRole);
       const matchSearch =
         p.nome.toLowerCase().includes(userSearch.toLowerCase()) ||
         p.email.toLowerCase().includes(userSearch.toLowerCase()) ||
         (p.equipeNome || '').toLowerCase().includes(userSearch.toLowerCase()) ||
-        p.id.toLowerCase().includes(userSearch.toLowerCase());
+        p.id.toLowerCase().includes(userSearch.toLowerCase()) ||
+        (p.funcao || '').toLowerCase().includes(userSearch.toLowerCase());
       return matchRole && matchSearch;
     });
   }, [participants, userRoleFilter, userSearch]);

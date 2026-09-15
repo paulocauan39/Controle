@@ -179,8 +179,14 @@ export const api = {
   getParticipants: async (): Promise<Participant[]> => {
     try {
       const [partsSnap, usersSnap] = await Promise.all([
-        getDocs(collection(db, 'participants')).catch(() => ({ docs: [], empty: true, forEach: () => {} })),
-        getDocs(collection(db, 'usuarios')).catch(() => ({ docs: [], empty: true, forEach: () => {} })),
+        getDocs(collection(db, 'participants')).catch((err) => {
+          console.warn('[API:getParticipants] Aviso consulta /participants:', err?.message || err);
+          return { docs: [], empty: true, forEach: () => {} };
+        }),
+        getDocs(collection(db, 'usuarios')).catch((err) => {
+          console.warn('[API:getParticipants] Aviso consulta /usuarios:', err?.message || err);
+          return { docs: [], empty: true, forEach: () => {} };
+        }),
       ]);
 
       const map = new Map<string, Participant>();
@@ -188,51 +194,73 @@ export const api = {
       // Read from /participants collection
       partsSnap.forEach((d: any) => {
         const data = d.data() || {};
-        const isPaulo = (data.email || '').toLowerCase().trim() === 'paulocauan39@gmail.com';
+        const email = (data.email || '').trim();
+        const isPaulo = email.toLowerCase() === 'paulocauan39@gmail.com';
+        const hasAdminRole = Boolean(
+          isPaulo ||
+          data.isAdmin === true ||
+          data.admin === true ||
+          data.funcao === 'admin' ||
+          data.perfil === 'admin' ||
+          data.role === 'admin' ||
+          data.roles?.includes('admin')
+        );
+
         const item: Participant = {
           id: d.id || data.id,
-          nome: data.nome || data.displayName || data.name || (data.email ? data.email.split('@')[0] : 'Participante'),
-          email: data.email || '',
+          nome: data.nome || data.displayName || data.name || (email ? email.split('@')[0] : 'Participante'),
+          email: email,
           funcao: (data.funcao || data.perfil || data.role || (isPaulo ? 'coordenador_aluno' : 'aluno')) as UserRole,
           status: data.status || 'Ativo',
-          dataEntrada: data.dataEntrada || new Date().toISOString().split('T')[0],
+          dataEntrada: data.dataEntrada || (data.createdAt ? String(data.createdAt).split('T')[0] : new Date().toISOString().split('T')[0]),
           createdAt: data.createdAt || new Date().toISOString(),
           ...(data.equipeId ? { equipeId: data.equipeId } : {}),
           ...(data.equipeNome ? { equipeNome: data.equipeNome } : {}),
-          ...(data.isAdmin !== undefined || isPaulo ? { isAdmin: data.isAdmin ?? isPaulo } : {}),
-          ...(data.roles ? { roles: data.roles } : {}),
+          isAdmin: hasAdminRole,
+          roles: data.roles || (hasAdminRole ? ['coordenador_aluno', 'admin'] : [data.funcao || 'aluno']),
         };
-        const key = (item.email || item.id).toLowerCase();
+        const key = (email || item.id).toLowerCase();
         map.set(key, item);
       });
 
       // Merge from /usuarios collection (ensures all Google Auth registered students appear)
       usersSnap.forEach((d: any) => {
         const data = d.data() || {};
-        const emailKey = (data.email || d.id || '').toLowerCase();
+        const email = (data.email || '').trim();
+        const emailKey = (email || d.id || '').toLowerCase();
         const existing = map.get(emailKey) || map.get(d.id.toLowerCase());
-        const isPaulo = (data.email || '').toLowerCase().trim() === 'paulocauan39@gmail.com';
+        const isPaulo = email.toLowerCase() === 'paulocauan39@gmail.com';
+        const hasAdminRole = Boolean(
+          isPaulo ||
+          existing?.isAdmin === true ||
+          data.isAdmin === true ||
+          data.admin === true ||
+          data.funcao === 'admin' ||
+          data.perfil === 'admin' ||
+          data.role === 'admin' ||
+          data.roles?.includes('admin')
+        );
 
         const item: Participant = {
           id: existing?.id || d.id || data.id,
-          nome: existing?.nome || data.nome || data.displayName || data.name || (data.email ? data.email.split('@')[0] : 'Usuário'),
-          email: existing?.email || data.email || '',
+          nome: existing?.nome || data.nome || data.displayName || data.name || (email ? email.split('@')[0] : 'Usuário'),
+          email: existing?.email || email,
           funcao: (existing?.funcao || data.funcao || data.perfil || data.role || (isPaulo ? 'coordenador_aluno' : 'aluno')) as UserRole,
           status: existing?.status || data.status || 'Ativo',
-          dataEntrada: existing?.dataEntrada || data.dataEntrada || new Date().toISOString().split('T')[0],
+          dataEntrada: existing?.dataEntrada || data.dataEntrada || (data.createdAt ? String(data.createdAt).split('T')[0] : new Date().toISOString().split('T')[0]),
           createdAt: existing?.createdAt || data.createdAt || new Date().toISOString(),
           ...(existing?.equipeId || data.equipeId ? { equipeId: existing?.equipeId || data.equipeId } : {}),
           ...(existing?.equipeNome || data.equipeNome ? { equipeNome: existing?.equipeNome || data.equipeNome } : {}),
-          ...(existing?.isAdmin !== undefined || data.isAdmin !== undefined || isPaulo
-            ? { isAdmin: existing?.isAdmin ?? data.isAdmin ?? isPaulo }
-            : {}),
-          ...(existing?.roles || data.roles ? { roles: existing?.roles || data.roles } : {}),
+          isAdmin: hasAdminRole,
+          roles: existing?.roles || data.roles || (hasAdminRole ? ['coordenador_aluno', 'admin'] : [data.funcao || 'aluno']),
         };
 
         map.set(emailKey || d.id, item);
       });
 
-      return Array.from(map.values());
+      const result = Array.from(map.values());
+      result.sort((a, b) => a.nome.localeCompare(b.nome));
+      return result;
     } catch (err: any) {
       console.error('[API] getParticipants error:', err);
       throw new Error(err.message || 'Erro ao consultar participantes no Firestore');
