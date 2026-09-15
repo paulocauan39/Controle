@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../services/api.js';
 import { DashboardStats } from '../types.js';
+import { useAuth } from '../context/AuthContext.js';
 import {
   Gamepad2,
   Users,
@@ -11,6 +12,8 @@ import {
   Calendar,
   History,
   TrendingUp,
+  ShieldCheck,
+  ArrowRight,
 } from 'lucide-react';
 import { ActiveTab } from './Navbar.js';
 import { EmptyState } from './EmptyState.js';
@@ -20,6 +23,7 @@ interface DashboardViewProps {
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab }) => {
+  const { isAdmin } = useAuth();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -54,13 +58,27 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab }) =>
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div className="border-b border-slate-200 pb-4">
-        <h1 className="text-xl font-bold text-slate-900 tracking-tight">
-          Painel de Acompanhamento Acadêmico
-        </h1>
-        <p className="text-sm text-slate-500 mt-1">
-          Indicadores operacionais e registro em tempo real das atividades do projeto de jogos com IA.
-        </p>
+      <div className="border-b border-slate-200 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-bold text-slate-900 tracking-tight">
+            Painel de Acompanhamento Acadêmico
+          </h1>
+          <p className="text-sm text-slate-500 mt-1">
+            Indicadores operacionais e registro em tempo real das atividades do projeto de jogos com IA.
+          </p>
+        </div>
+
+        {isAdmin && setActiveTab && (
+          <button
+            id="btn-goto-admin"
+            onClick={() => setActiveTab('administracao')}
+            className="inline-flex items-center gap-2 px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg shadow-xs transition-colors self-start sm:self-auto border border-slate-700"
+          >
+            <ShieldCheck className="w-4 h-4 text-emerald-400" />
+            Painel de Administração
+            <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
+          </button>
+        )}
       </div>
 
       {!hasAnyData && (

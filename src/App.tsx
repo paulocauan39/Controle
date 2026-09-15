@@ -22,10 +22,13 @@ import { DocumentsView } from './components/DocumentsView.js';
 import { HistoryView } from './components/HistoryView.js';
 import { ReportsView } from './components/ReportsView.js';
 import { SystemInfoView } from './components/SystemInfoView.js';
-import { UserRole } from './types.js';
+import { AdminView } from './components/AdminView.js';
+import { UserRole, Participant } from './types.js';
+import { isAdmin as checkIsAdmin } from './utils/admin.js';
 
 const VALID_TABS: ActiveTab[] = [
   'dashboard',
+  'administracao',
   'participantes',
   'equipes',
   'jogos',
@@ -44,9 +47,25 @@ const VALID_TABS: ActiveTab[] = [
   'sistema',
 ];
 
-// Helper to check route permissions based on UserRole
-const checkTabPermission = (tab: ActiveTab, role?: UserRole): { allowed: boolean; reason?: string } => {
-  if (!role) return { allowed: false, reason: 'Usuário não autenticado.' };
+// Helper to check route permissions based on UserRole and Admin status
+const checkTabPermission = (
+  tab: ActiveTab,
+  role?: UserRole,
+  user?: Participant | null
+): { allowed: boolean; reason?: string } => {
+  if (!role && !user) return { allowed: false, reason: 'Usuário não autenticado.' };
+
+  const isUserAdmin = checkIsAdmin(user) || role === 'admin';
+  if (isUserAdmin) {
+    return { allowed: true };
+  }
+
+  if (tab === 'administracao') {
+    return {
+      allowed: false,
+      reason: 'O Painel de Administração é restrito exclusivamente aos administradores do sistema.',
+    };
+  }
 
   if (tab === 'participantes' && (role === 'aluno' || role === 'professor_colaborador')) {
     return {
@@ -207,7 +226,7 @@ const MainLayout: React.FC = () => {
   }
 
   // Validate that currentUser profile has a valid defined role and active status
-  const validRoles: UserRole[] = ['coordenador_aluno', 'professor_orientador', 'professor_colaborador', 'aluno'];
+  const validRoles: UserRole[] = ['admin', 'coordenador_aluno', 'professor_orientador', 'professor_colaborador', 'aluno'];
   const isProfileValid = currentUser.funcao && validRoles.includes(currentUser.funcao) && currentUser.status !== 'Inativo';
 
   if (!isProfileValid) {
@@ -221,7 +240,7 @@ const MainLayout: React.FC = () => {
   }
 
   // Permission verification for activeTab
-  const permission = checkTabPermission(activeTab, currentUser.funcao);
+  const permission = checkTabPermission(activeTab, currentUser.funcao, currentUser);
 
   const renderContent = () => {
     if (!permission.allowed) {
@@ -238,6 +257,8 @@ const MainLayout: React.FC = () => {
     switch (activeTab) {
       case 'dashboard':
         return <DashboardView setActiveTab={setActiveTab} />;
+      case 'administracao':
+        return <AdminView onNavigateToTab={setActiveTab} />;
       case 'participantes':
         return <ParticipantsView />;
       case 'equipes':

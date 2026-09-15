@@ -146,10 +146,68 @@ export async function getParticipantFromFirestore(uidOrEmail: string, optionalEm
       if (partDocSnap.exists()) {
         const data = partDocSnap.data();
         console.log(`[FirestoreFetch] Documento encontrado em /participants/${targetKey}:`, data);
-        return data as Participant;
+        return {
+          id: data.id || targetKey,
+          nome: data.nome || data.displayName || data.name || (email ? email.split('@')[0] : 'Usuário'),
+          email: data.email || email,
+          funcao: (data.funcao || data.perfil || data.role || 'aluno'),
+          status: data.status || 'Ativo',
+          dataEntrada: data.dataEntrada || new Date().toISOString().split('T')[0],
+          ...data,
+        } as Participant;
       }
     } catch (errPartDoc: any) {
       console.warn(`[FirestoreFetch] Erro getDoc /participants/${targetKey}:`, errPartDoc?.code || errPartDoc?.message || errPartDoc);
+    }
+  }
+
+  // 4. Query in 'participants' collection where 'email' == email
+  if (email) {
+    try {
+      console.log(`[FirestoreFetch] query participants where email == ${email}`);
+      const qPart = query(collection(db, 'participants'), where('email', '==', email));
+      const partQuerySnap = await getDocs(qPart);
+      if (!partQuerySnap.empty) {
+        const firstDoc = partQuerySnap.docs[0];
+        const data = firstDoc.data();
+        console.log(`[FirestoreFetch] Documento encontrado via query em /participants/${firstDoc.id}:`, data);
+        return {
+          id: data.id || firstDoc.id,
+          nome: data.nome || data.displayName || data.name || email.split('@')[0],
+          email: data.email || email,
+          funcao: (data.funcao || data.perfil || data.role || 'aluno'),
+          status: data.status || 'Ativo',
+          dataEntrada: data.dataEntrada || new Date().toISOString().split('T')[0],
+          ...data,
+        } as Participant;
+      }
+    } catch (errQueryPart: any) {
+      console.warn(`[FirestoreFetch] Erro query participants:`, errQueryPart?.code || errQueryPart?.message || errQueryPart);
+    }
+  }
+
+  // 5. Query in 'usuarios' collection where 'email' == email
+  if (email) {
+    try {
+      console.log(`[FirestoreFetch] query usuarios where email == ${email}`);
+      const qUser = query(collection(db, 'usuarios'), where('email', '==', email));
+      const userQuerySnap = await getDocs(qUser);
+      if (!userQuerySnap.empty) {
+        const firstDoc = userQuerySnap.docs[0];
+        const data = firstDoc.data();
+        console.log(`[FirestoreFetch] Documento encontrado via query em /usuarios/${firstDoc.id}:`, data);
+        return {
+          id: data.id || firstDoc.id,
+          nome: data.nome || data.displayName || data.name || email.split('@')[0],
+          email: data.email || email,
+          funcao: (data.funcao || data.perfil || data.role || 'aluno'),
+          status: data.status || 'Ativo',
+          dataEntrada: data.dataEntrada || new Date().toISOString().split('T')[0],
+          ...data,
+        } as Participant;
+      }
+    } catch (errQueryUser: any) {
+      console.warn(`[FirestoreFetch] Erro query usuarios:`, errQueryUser?.code || errQueryUser?.message || errQueryUser);
     }
   }
 

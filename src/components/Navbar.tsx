@@ -27,11 +27,13 @@ import {
   Sun,
   Moon,
   ShieldAlert,
+  ShieldCheck,
 } from 'lucide-react';
 import { Participant, UserRole } from '../types.js';
 
 export type ActiveTab =
   | 'dashboard'
+  | 'administracao'
   | 'participantes'
   | 'equipes'
   | 'jogos'
@@ -100,6 +102,7 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
 
   const navItems = [
     { id: 'dashboard' as ActiveTab, label: 'Visão Geral', icon: LayoutDashboard },
+    ...(isAdmin ? [{ id: 'administracao' as ActiveTab, label: 'Administração', icon: ShieldCheck }] : []),
     ...(canAccessParticipants ? [{ id: 'participantes' as ActiveTab, label: 'Participantes', icon: Users }] : []),
     { id: 'equipes' as ActiveTab, label: 'Equipes', icon: Briefcase },
     { id: 'jogos' as ActiveTab, label: 'Jogos', icon: Gamepad2 },
@@ -207,6 +210,22 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
                         {isDark ? 'Modo Escuro' : 'Modo Claro'}
                       </button>
                     </div>
+
+                    {isAdmin && (
+                      <div className="px-3 py-2 border-b border-slate-100 bg-indigo-50/60">
+                        <button
+                          id="menu-btn-admin-panel"
+                          onClick={() => {
+                            setActiveTab('administracao');
+                            setUserMenuOpen(false);
+                          }}
+                          className="w-full text-left px-3 py-1.5 text-xs font-semibold text-indigo-950 hover:bg-indigo-100 rounded-md flex items-center gap-2 transition-colors"
+                        >
+                          <ShieldCheck className="w-4 h-4 text-indigo-600" />
+                          Painel de Administração
+                        </button>
+                      </div>
+                    )}
 
                     <div className="px-4 py-1.5 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
                       Alternar Perfil para Teste
