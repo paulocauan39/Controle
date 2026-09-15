@@ -212,5 +212,39 @@ service cloud.firestore {
       allow create: if isSignedIn() && (isAdmin() || isValidAudit(incoming()));
       allow update, delete: if isAdmin();
     }
+
+    // Versions validation
+    match /versions/{versionId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
+    }
+
+    // Test Suites & Evaluations
+    match /testSuites/{suiteId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
+    }
+
+    match /testEvaluations/{evalId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
+    }
+
+    // Schedule
+    match /schedule/{milestoneId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
+    }
+
+    // System versions & suggestions
+    match /systemVersions/{versionId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
+    }
+
+    match /futureSuggestions/{suggestionId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
+    }
   }
 }

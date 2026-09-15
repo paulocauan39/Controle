@@ -154,28 +154,13 @@ export const InitialSetup: React.FC<InitialSetupProps> = ({ onSetupCompleted }) 
 
           <button
             type="submit"
-            disabled={loading || loadingSeed}
+            disabled={loading}
             className="w-full mt-4 flex items-center justify-center gap-2 py-2.5 px-4 bg-indigo-900 hover:bg-indigo-800 text-white text-sm font-medium rounded-md shadow-xs transition-colors disabled:opacity-50"
           >
             {loading ? 'Cadastrando...' : 'Cadastrar e Iniciar Plataforma'}
             <ArrowRight className="w-4 h-4" />
           </button>
         </form>
-
-        <div className="mt-5 pt-4 border-t border-slate-200 text-center">
-          <button
-            type="button"
-            onClick={handleSeedDemo}
-            disabled={loading || loadingSeed}
-            className="w-full flex items-center justify-center gap-2 py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-md border border-slate-300 transition-colors disabled:opacity-50"
-          >
-            <Database className="w-3.5 h-3.5 text-indigo-700" />
-            {loadingSeed ? 'Carregando dados...' : 'Carregar Dados de Exemplo da Pesquisa (Demonstração)'}
-          </button>
-          <p className="text-[11px] text-slate-500 mt-2">
-            Pré-carrega equipes, jogos, IAs catalogadas, tarefas e experimentos acadêmicos.
-          </p>
-        </div>
       </div>
     </div>
   );

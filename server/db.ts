@@ -807,30 +807,20 @@ export class Database {
             (this.data as any)[key] = initial[key];
           }
         }
-        if (!this.data.documents || this.data.documents.length === 0) {
-          this.data.documents = INITIAL_DOCUMENTS;
-        }
-        if (!this.data.promptCategoryItems || this.data.promptCategoryItems.length === 0) {
-          this.data.promptCategoryItems = INITIAL_PROMPT_CATEGORY_ITEMS;
-        }
-        // Auto-seed if participants array is empty
-        if (this.data.participants.length === 0) {
-          this.data = getInitialSeedData();
-          this.save();
-        }
       } catch (err) {
-        console.error('Error reading database file, initializing seed database', err);
-        this.data = getInitialSeedData();
+        console.log('Initializing empty database structure');
+        this.data = getInitialDB();
         this.save();
       }
     } else {
-      this.data = getInitialSeedData();
+      this.data = getInitialDB();
       this.save();
     }
   }
 
   public seedDefaultData(): void {
-    this.data = getInitialSeedData();
+    // Disabled to preserve real Firestore data integrity
+    this.data = getInitialDB();
     this.save();
   }
 

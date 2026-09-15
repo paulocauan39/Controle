@@ -1,8 +1,10 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { collection, onSnapshot, doc, query, orderBy, getDocs } from 'firebase/firestore';
+import { db } from '../lib/firebase.js';
 import { api } from '../services/api.js';
 import { Participant, Team, Game, Task, UserRole, AuditLog } from '../types.js';
 import { useAuth } from '../context/AuthContext.js';
-import { useAdminAudit } from '../hooks/useAdminAudit.js';
+import { useAuditLogger } from '../hooks/useAuditLogger.js';
 import { isAdmin as checkIsAdmin } from '../utils/admin.js';
 import { EmptyState } from './EmptyState.js';
 import { PromptCategoryManagerModal } from './PromptCategoryManagerModal.js';
@@ -29,7 +31,8 @@ import {
   XCircle,
   Database,
   Lock,
-  FileText
+  FileText,
+  Activity
 } from 'lucide-react';
 
 interface AdminViewProps {
@@ -38,7 +41,7 @@ interface AdminViewProps {
 
 export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToTab }) => {
   const { currentUser, refreshAuth } = useAuth();
-  const { logDeletion, logEdit, logAdminAction } = useAdminAudit();
+  const { logDeletion, logEdit, logAdminAction } = useAuditLogger();
 
   const [activeSubTab, setActiveSubTab] = useState<'visao_geral' | 'usuarios' | 'auditoria' | 'configuracoes'>('visao_geral');
   const [loading, setLoading] = useState(true);
@@ -62,7 +65,7 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToTab }) => {
   const [isSavingUser, setIsSavingUser] = useState(false);
   const [userModalError, setUserModalError] = useState('');
 
-  // Delete User Modal
+  // Delete User Modal with Confirmation Flow
   const [deleteUserModalOpen, setDeleteUserModalOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<Participant | null>(null);
   const [isDeletingUser, setIsDeletingUser] = useState(false);
@@ -73,43 +76,138 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToTab }) => {
   const [userRoleFilter, setUserRoleFilter] = useState('todos');
   const [auditSearch, setAuditSearch] = useState('');
 
-  const loadAllData = async () => {
-    try {
-      setLoading(true);
-      const [partsData, teamsData, tasksData, gamesData, logsData] = await Promise.all([
-        api.getParticipants().catch(() => []),
-        api.getTeams().catch(() => []),
-        api.getTasks().catch(() => []),
-        api.getGames().catch(() => []),
-        api.getAuditLogs().catch(() => []),
-      ]);
-
-      setParticipants(partsData);
-      setTeams(teamsData);
-      setTasks(tasksData);
-      setGames(gamesData);
-      setAuditLogs(logsData);
-    } catch (err) {
-      console.error('[AdminView] Erro ao carregar dados do painel:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadAllData();
-  }, []);
-
   const isCurrentAdmin = checkIsAdmin(currentUser);
 
-  // Filtered Participants
+  // Direct onSnapshot listeners on Firestore collections
+  useEffect(() => {
+    setLoading(true);
+
+    // 1. Direct real-time listener on 'usuarios' collection by UID
+    const unsubscribeUsers = onSnapshot(
+      collection(db, 'usuarios'),
+      (snapshot) => {
+        const usersList: Participant[] = snapshot.docs.map((docSnap) => {
+          const data = docSnap.data() || {};
+          const uid = docSnap.id;
+          const email = (data.email || '').trim();
+          const isPaulo = email.toLowerCase() === 'paulocauan39@gmail.com';
+          const hasAdminRole = Boolean(
+            isPaulo ||
+            data.isAdmin === true ||
+            data.admin === true ||
+            data.funcao === 'admin' ||
+            data.perfil === 'admin' ||
+            data.role === 'admin' ||
+            data.roles?.includes('admin')
+          );
+
+          return {
+            id: uid, // UID from document ID
+            nome: data.nome || data.displayName || data.name || (email ? email.split('@')[0] : 'Usuário'),
+            email: email,
+            funcao: (data.funcao || data.perfil || data.role || (isPaulo ? 'coordenador_aluno' : 'aluno')) as UserRole,
+            isAdmin: hasAdminRole,
+            roles: data.roles || (hasAdminRole ? ['admin'] : ['aluno']),
+            equipeId: data.equipeId || undefined,
+            equipeNome: data.equipeNome || undefined,
+            status: (data.status as 'Ativo' | 'Inativo') || 'Ativo',
+            dataEntrada: data.dataEntrada || (data.createdAt ? String(data.createdAt).split('T')[0] : new Date().toISOString().split('T')[0]),
+            createdAt: data.createdAt || new Date().toISOString(),
+          };
+        });
+
+        // Sort by name
+        usersList.sort((a, b) => a.nome.localeCompare(b.nome));
+        setParticipants(usersList);
+        setLoading(false);
+      },
+      (err) => {
+        console.error('[AdminView] Erro no listener onSnapshot /usuarios:', err);
+        setLoading(false);
+      }
+    );
+
+    // 2. Direct real-time listener on 'audit_logs' collection
+    const unsubscribeAudit = onSnapshot(
+      collection(db, 'audit_logs'),
+      (snapshot) => {
+        const logsList: AuditLog[] = snapshot.docs.map((docSnap) => ({
+          id: docSnap.id,
+          ...docSnap.data(),
+        } as AuditLog));
+
+        // Sort logs by timestamp descending
+        logsList.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+        setAuditLogs(logsList);
+      },
+      (err) => {
+        console.warn('[AdminView] Erro no listener onSnapshot /audit_logs:', err);
+      }
+    );
+
+    // 3. Real-time listener on 'teams' collection
+    const unsubscribeTeams = onSnapshot(
+      collection(db, 'teams'),
+      (snapshot) => {
+        const teamsList: Team[] = snapshot.docs.map((d) => ({
+          id: d.id,
+          ...d.data(),
+        } as Team));
+        setTeams(teamsList);
+      },
+      (err) => {
+        console.warn('[AdminView] Erro no listener onSnapshot /teams:', err);
+      }
+    );
+
+    // 4. Real-time listener on 'tasks' collection
+    const unsubscribeTasks = onSnapshot(
+      collection(db, 'tasks'),
+      (snapshot) => {
+        const tasksList: Task[] = snapshot.docs.map((d) => ({
+          id: d.id,
+          ...d.data(),
+        } as Task));
+        setTasks(tasksList);
+      },
+      (err) => {
+        console.warn('[AdminView] Erro no listener onSnapshot /tasks:', err);
+      }
+    );
+
+    // 5. Real-time listener on 'games' collection
+    const unsubscribeGames = onSnapshot(
+      collection(db, 'games'),
+      (snapshot) => {
+        const gamesList: Game[] = snapshot.docs.map((d) => ({
+          id: d.id,
+          ...d.data(),
+        } as Game));
+        setGames(gamesList);
+      },
+      (err) => {
+        console.warn('[AdminView] Erro no listener onSnapshot /games:', err);
+      }
+    );
+
+    return () => {
+      unsubscribeUsers();
+      unsubscribeAudit();
+      unsubscribeTeams();
+      unsubscribeTasks();
+      unsubscribeGames();
+    };
+  }, []);
+
+  // Filtered Participants based on search query and role filter
   const filteredParticipants = useMemo(() => {
     return participants.filter((p) => {
       const matchRole = userRoleFilter === 'todos' || p.funcao === userRoleFilter;
       const matchSearch =
         p.nome.toLowerCase().includes(userSearch.toLowerCase()) ||
         p.email.toLowerCase().includes(userSearch.toLowerCase()) ||
-        (p.equipeNome || '').toLowerCase().includes(userSearch.toLowerCase());
+        (p.equipeNome || '').toLowerCase().includes(userSearch.toLowerCase()) ||
+        p.id.toLowerCase().includes(userSearch.toLowerCase());
       return matchRole && matchSearch;
     });
   }, [participants, userRoleFilter, userSearch]);
@@ -119,16 +217,17 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToTab }) => {
     return auditLogs.filter((l) => {
       const q = auditSearch.toLowerCase();
       return (
-        l.usuarioNome.toLowerCase().includes(q) ||
-        l.acao.toLowerCase().includes(q) ||
-        l.registroAfetado.toLowerCase().includes(q) ||
+        (l.usuarioNome || '').toLowerCase().includes(q) ||
+        (l.acao || '').toLowerCase().includes(q) ||
+        (l.registroAfetado || '').toLowerCase().includes(q) ||
         (l.moduloAfetado || '').toLowerCase().includes(q) ||
-        l.alteracaoRealizada.toLowerCase().includes(q)
+        (l.alteracaoRealizada || '').toLowerCase().includes(q) ||
+        (l.entidadeId || '').toLowerCase().includes(q)
       );
     });
   }, [auditLogs, auditSearch]);
 
-  // User Actions
+  // User Edit Modal Handlers
   const handleOpenEditUser = (p: Participant) => {
     setEditingUser(p);
     setEditNome(p.nome);
@@ -154,7 +253,12 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToTab }) => {
   const handleSaveUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editNome.trim() || !editEmail.trim()) {
-      setUserModalError('Nome e E-mail são obrigatórios.');
+      setUserModalError('Nome e E-mail são campos obrigatórios.');
+      return;
+    }
+
+    if (!isCurrentAdmin) {
+      setUserModalError('Apenas administradores podem modificar dados de usuários.');
       return;
     }
 
@@ -172,10 +276,16 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToTab }) => {
         });
 
         await logEdit(
-          'Participantes',
+          'usuarios',
           editingUser.id,
           editNome.trim(),
-          `Administrador atualizou o usuário ${editNome.trim()} (Função: ${editFuncao}, Status: ${editStatus}).`
+          `Administrador alterou perfil do usuário ${editNome.trim()} (Função: ${editFuncao}, Status: ${editStatus}, Equipe: ${editEquipeId || 'Nenhuma'}).`,
+          {
+            targetUid: editingUser.id,
+            targetEmail: editEmail.trim(),
+            novaFuncao: editFuncao,
+            novoStatus: editStatus,
+          }
         );
       } else {
         const created = await api.createParticipant({
@@ -189,18 +299,22 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToTab }) => {
 
         await logAdminAction({
           acao: 'CADASTRO_USUARIO_ADMIN',
-          tipoEntidade: 'Participantes',
+          tipoEntidade: 'usuarios',
           registroAfetado: editNome.trim(),
-          entidadeId: created?.id || 'new',
-          alteracaoRealizada: `Administrador cadastrou novo usuário: ${editNome.trim()} (${editEmail.trim()}) com função ${editFuncao}.`,
+          entidadeId: created?.id || 'new_uid',
+          alteracaoRealizada: `Administrador cadastrou novo usuário no Firestore: ${editNome.trim()} (${editEmail.trim()}) com papel ${editFuncao}.`,
+          detalhes: {
+            email: editEmail.trim(),
+            funcao: editFuncao,
+            status: editStatus,
+          },
         });
       }
 
       setUserModalOpen(false);
-      await loadAllData();
       await refreshAuth();
     } catch (err: any) {
-      console.error('[AdminView] Erro ao salvar usuário:', err);
+      console.error('[AdminView] Erro ao salvar usuário no Firestore:', err);
       setUserModalError(err.message || 'Erro ao persistir usuário.');
     } finally {
       setIsSavingUser(false);
@@ -208,6 +322,11 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToTab }) => {
   };
 
   const handleToggleStatus = async (p: Participant) => {
+    if (!isCurrentAdmin) {
+      alert('Apenas administradores podem alterar o status de acesso.');
+      return;
+    }
+
     const newStatus = p.status === 'Ativo' ? 'Inativo' : 'Ativo';
     if (!confirm(`Deseja alterar o status de "${p.nome}" para ${newStatus}?`)) return;
 
@@ -219,39 +338,63 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToTab }) => {
       }
 
       await logEdit(
-        'Participantes',
+        'usuarios',
         p.id,
         p.nome,
-        `Status do usuário alterado para ${newStatus} por ação administrativa.`
+        `Status do usuário ${p.nome} alterado para "${newStatus}" por ação administrativa.`,
+        {
+          targetUid: p.id,
+          targetEmail: p.email,
+          statusAnterior: p.status,
+          novoStatus: newStatus,
+        }
       );
-      await loadAllData();
       await refreshAuth();
     } catch (err: any) {
-      alert(err.message || 'Erro ao alterar status.');
+      alert(err.message || 'Erro ao alterar status no Firestore.');
     }
   };
 
+  // Robust Deletion Flow with Admin Role Check and Audit Logging
   const handleDeleteUser = async () => {
     if (!userToDelete) return;
+
+    // Strict admin role verification
+    if (!isCurrentAdmin) {
+      setDeleteError('Acesso negado: apenas administradores possuem privilégios para executar a exclusão permanente de registros.');
+      return;
+    }
+
     try {
       setIsDeletingUser(true);
       setDeleteError('');
 
-      await api.deleteParticipant(userToDelete.id);
+      // 1. Call robust delete service function
+      await api.deleteUserDoc(userToDelete.id, currentUser);
+
+      // 2. Log 'deleteDoc' operation using useAuditLogger hook to ensure accountability
       await logDeletion(
-        'Participantes',
+        'usuarios',
         userToDelete.id,
         userToDelete.nome,
-        `Exclusão permanente do usuário "${userToDelete.nome}" (${userToDelete.email}) efetuada pelo Painel de Administração.`
+        `Exclusão permanente (deleteDoc) do documento de usuário UID "${userToDelete.id}" (${userToDelete.nome} - ${userToDelete.email}) efetuada por administrador.`,
+        {
+          targetUid: userToDelete.id,
+          targetEmail: userToDelete.email,
+          targetName: userToDelete.nome,
+          targetRole: userToDelete.funcao,
+          targetTeam: userToDelete.equipeId || 'Sem equipe',
+          deletedAt: new Date().toISOString(),
+          operationType: 'deleteDoc',
+        }
       );
 
       setDeleteUserModalOpen(false);
       setUserToDelete(null);
-      await loadAllData();
       await refreshAuth();
     } catch (err: any) {
-      console.error('[AdminView] Erro ao excluir participante:', err);
-      setDeleteError(err.message || 'Erro ao excluir usuário.');
+      console.error('[AdminView] Erro ao executar deleteDoc de usuário:', err);
+      setDeleteError(err.message || 'Erro ao excluir usuário no Firestore.');
     } finally {
       setIsDeletingUser(false);
     }
@@ -283,25 +426,19 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToTab }) => {
               </div>
               <h1 className="text-2xl font-bold tracking-tight text-white">Painel de Administração & Governança</h1>
               <span className="px-2.5 py-0.5 text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-full flex items-center gap-1">
-                <Lock className="w-3 h-3" /> Controle Total
+                <Lock className="w-3 h-3" /> Firestore Live Sync
               </span>
             </div>
             <p className="text-xs text-slate-300 max-w-2xl leading-relaxed">
-              Gestão centralizada de permissões, usuários, integridade de dados acadêmicos e trilha de auditoria para o projeto NexoIF.
+              Gestão centralizada e em tempo real de contas da coleção <code>usuarios</code>, controle de acessos e trilha imutável de auditoria.
             </p>
           </div>
 
           <div className="flex items-center gap-2 self-start md:self-auto">
-            <button
-              id="btn-admin-reload"
-              type="button"
-              onClick={loadAllData}
-              disabled={loading}
-              className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium rounded-lg border border-slate-700 transition-colors shadow-xs"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-indigo-400' : ''}`} />
-              Atualizar Dados
-            </button>
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-950/60 border border-emerald-800/80 rounded-lg text-emerald-300 text-xs font-medium">
+              <Activity className="w-3.5 h-3.5 animate-pulse text-emerald-400" />
+              <span>onSnapshot Ativo</span>
+            </div>
             <button
               id="btn-admin-manage-categories"
               type="button"
@@ -318,7 +455,7 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToTab }) => {
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mt-6 pt-5 border-t border-slate-800/80">
           <div className="bg-slate-800/50 border border-slate-700/60 rounded-lg p-3">
             <div className="flex items-center justify-between text-slate-400 text-xs">
-              <span>Usuários</span>
+              <span>Usuários (UID)</span>
               <Users className="w-3.5 h-3.5 text-indigo-400" />
             </div>
             <div className="text-xl font-bold text-white mt-1">{participants.length}</div>
@@ -405,7 +542,7 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToTab }) => {
           }`}
         >
           <Users className="w-4 h-4" />
-          Gestão de Usuários e Perfis ({participants.length})
+          Coleção 'usuarios' em Tempo Real ({participants.length})
         </button>
 
         <button
@@ -418,7 +555,7 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToTab }) => {
           }`}
         >
           <History className="w-4 h-4" />
-          Trilha de Auditoria Geral ({auditLogs.length})
+          Trilha de Auditoria 'audit_logs' ({auditLogs.length})
         </button>
 
         <button
@@ -431,7 +568,7 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToTab }) => {
           }`}
         >
           <Database className="w-4 h-4" />
-          Segurança & Ações Críticas
+          Segurança & Políticas
         </button>
       </div>
 
@@ -483,10 +620,10 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToTab }) => {
               </p>
               <div className="space-y-2 text-xs">
                 <div className="p-2 bg-emerald-50 border border-emerald-100 rounded text-emerald-900">
-                  <strong>Leitura e Escrita Global:</strong> Acesso direto para gerenciar, aprovar e retificar registros em todas as coleções do Firestore.
+                  <strong>onSnapshot em Tempo Real:</strong> As alterações na coleção <code>usuarios</code> são sincronizadas instantaneamente sem recarregar a página.
                 </div>
                 <div className="p-2 bg-indigo-50 border border-indigo-100 rounded text-indigo-900">
-                  <strong>Trilha de Auditoria:</strong> Exclusões e modificações são registradas na coleção <code>audit_logs</code> para garantir conformidade acadêmica.
+                  <strong>Trilha de Auditoria com useAuditLogger:</strong> Cada exclusão de documento (<code>deleteDoc</code>) é registrada na coleção <code>audit_logs</code>.
                 </div>
               </div>
             </div>
@@ -497,7 +634,7 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToTab }) => {
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                 <History className="w-4 h-4 text-purple-600" />
-                Últimas Atividades Registradas na Auditoria
+                Últimas Atividades Registradas na Auditoria (Live)
               </h3>
               <button
                 onClick={() => setActiveSubTab('auditoria')}
@@ -515,14 +652,14 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToTab }) => {
                   <div key={log.id} className="py-2.5 flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
                       <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
-                        log.acao.includes('EXCLU') ? 'bg-rose-100 text-rose-800' :
+                        log.acao.includes('deleteDoc') || log.acao.includes('EXCLU') ? 'bg-rose-100 text-rose-800' :
                         log.acao.includes('CRIAR') || log.acao.includes('CADASTRO') ? 'bg-emerald-100 text-emerald-800' :
                         'bg-blue-100 text-blue-800'
                       }`}>
                         {log.acao}
                       </span>
                       <span className="font-semibold text-slate-900">{log.usuarioNome}</span>
-                      <span className="text-slate-500">• {log.moduloAfetado} ({log.registroAfetado})</span>
+                      <span className="text-slate-500">• {log.moduloAfetado || log.tipoEntidade} ({log.registroAfetado})</span>
                     </div>
                     <span className="text-slate-400 font-mono text-[11px] whitespace-nowrap">
                       {log.data} {log.horario}
@@ -540,8 +677,15 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToTab }) => {
         <div className="bg-white border border-slate-200 rounded-xl shadow-xs overflow-hidden space-y-4 p-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
             <div>
-              <h3 className="text-base font-bold text-slate-900">Gerenciamento Central de Usuários</h3>
-              <p className="text-xs text-slate-500">Configure papéis acadêmicos, status de acesso e equipes atribuídas.</p>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-bold text-slate-900">Usuários no Firestore (/usuarios)</h3>
+                <span className="px-2 py-0.5 text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 rounded">
+                  Live onSnapshot
+                </span>
+              </div>
+              <p className="text-xs text-slate-500">
+                Consulta direta e em tempo real dos documentos indexados por UID no Firestore.
+              </p>
             </div>
             <button
               id="btn-admin-create-user"
@@ -550,7 +694,7 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToTab }) => {
               className="inline-flex items-center gap-1.5 px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg transition-colors shadow-xs self-start sm:self-auto"
             >
               <Plus className="w-4 h-4" />
-              Novo Participante / Usuário
+              Novo Usuário no Firestore
             </button>
           </div>
 
@@ -560,7 +704,7 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToTab }) => {
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
               <input
                 type="text"
-                placeholder="Buscar por nome, e-mail ou equipe..."
+                placeholder="Buscar por UID, nome, e-mail..."
                 value={userSearch}
                 onChange={(e) => setUserSearch(e.target.value)}
                 className="w-full pl-9 pr-3 py-1.5 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600"
@@ -584,32 +728,40 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToTab }) => {
             </div>
           </div>
 
-          {/* Table */}
-          {filteredParticipants.length === 0 ? (
-            <EmptyState message="Nenhum usuário encontrado." subMessage="Tente ajustar os filtros de busca." />
+          {/* Table of Users */}
+          {loading ? (
+            <div className="py-12 flex flex-col items-center justify-center text-slate-500 gap-2">
+              <RefreshCw className="w-6 h-6 animate-spin text-indigo-600" />
+              <span className="text-xs">Sincronizando com a coleção /usuarios...</span>
+            </div>
+          ) : filteredParticipants.length === 0 ? (
+            <EmptyState message="Nenhum usuário encontrado na coleção do Firestore." subMessage="Cadastre um novo usuário ou verifique os filtros." />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 uppercase tracking-wider text-[11px] font-bold">
                   <tr>
-                    <th className="py-3 px-4">Nome / E-mail</th>
-                    <th className="py-3 px-4">Função Acadêmica</th>
+                    <th className="py-3 px-4">Usuário / E-mail</th>
+                    <th className="py-3 px-4">UID Firestore</th>
+                    <th className="py-3 px-4">Função / Privilégio</th>
                     <th className="py-3 px-4">Equipe</th>
                     <th className="py-3 px-4">Status</th>
-                    <th className="py-3 px-4">Data Entrada</th>
                     <th className="py-3 px-4 text-right">Ações Administrativas</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-slate-800 text-xs">
                   {filteredParticipants.map((p) => {
-                    const isPaulo = (p.email || '').toLowerCase() === 'paulocauan39@gmail.com';
-                    const hasAdminPrivilege = isPaulo || p.funcao === 'admin' || p.isAdmin === true || p.roles?.includes('admin');
+                    const isPaulo = (p.email || '').toLowerCase().trim() === 'paulocauan39@gmail.com';
+                    const hasAdminPrivilege = isPaulo || p.funcao === 'admin' || p.isAdmin === true;
 
                     return (
                       <tr key={p.id} className="hover:bg-slate-50/70 transition-colors">
                         <td className="py-3 px-4">
                           <div className="font-semibold text-slate-900">{p.nome}</div>
                           <div className="text-slate-500 text-[11px]">{p.email}</div>
+                        </td>
+                        <td className="py-3 px-4 font-mono text-[11px] text-slate-500 select-all" title={p.id}>
+                          {p.id.length > 18 ? `${p.id.substring(0, 18)}...` : p.id}
                         </td>
                         <td className="py-3 px-4 whitespace-nowrap">
                           {hasAdminPrivilege ? (
@@ -645,9 +797,6 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToTab }) => {
                             {p.status || 'Ativo'}
                           </span>
                         </td>
-                        <td className="py-3 px-4 text-slate-500 font-mono text-[11px]">
-                          {p.dataEntrada || '—'}
-                        </td>
                         <td className="py-3 px-4 text-right whitespace-nowrap">
                           <div className="flex items-center justify-end gap-1.5">
                             <button
@@ -670,10 +819,11 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToTab }) => {
                             </button>
                             <button
                               onClick={() => {
+                                setDeleteError('');
                                 setUserToDelete(p);
                                 setDeleteUserModalOpen(true);
                               }}
-                              title="Excluir Permanentemente"
+                              title="Excluir Permanentemente (deleteDoc)"
                               className="p-1.5 text-rose-600 hover:bg-rose-50 rounded transition-colors"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -695,19 +845,24 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToTab }) => {
         <div className="bg-white border border-slate-200 rounded-xl shadow-xs overflow-hidden space-y-4 p-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
             <div>
-              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                <History className="w-4 h-4 text-indigo-600" />
-                Trilha de Auditoria & Logs de Operações Críticas
-              </h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <History className="w-4 h-4 text-indigo-600" />
+                  Trilha de Auditoria (Coleção 'audit_logs')
+                </h3>
+                <span className="px-2 py-0.5 text-[10px] font-semibold bg-purple-50 text-purple-700 border border-purple-200 rounded">
+                  onSnapshot em Tempo Real
+                </span>
+              </div>
               <p className="text-xs text-slate-500">
-                Registros gravados nas coleções <code>audit_logs</code> e <code>auditLogs</code> do Firestore.
+                Registro detalhado e imutável de todas as exclusões (<code>deleteDoc</code>) e modificações administrativas no Firestore.
               </p>
             </div>
             <div className="relative w-full sm:w-72">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
               <input
                 type="text"
-                placeholder="Filtrar logs por ação, usuário..."
+                placeholder="Filtrar logs por ação, usuário, UID..."
                 value={auditSearch}
                 onChange={(e) => setAuditSearch(e.target.value)}
                 className="w-full pl-9 pr-3 py-1.5 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600"
@@ -716,16 +871,16 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToTab }) => {
           </div>
 
           {filteredAuditLogs.length === 0 ? (
-            <EmptyState message="Nenhum registro de auditoria encontrado." />
+            <EmptyState message="Nenhum registro de auditoria encontrado na coleção 'audit_logs'." />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 uppercase tracking-wider text-[11px] font-bold">
                   <tr>
                     <th className="py-3 px-4">Data / Horário</th>
-                    <th className="py-3 px-4">Usuário</th>
+                    <th className="py-3 px-4">Executor</th>
                     <th className="py-3 px-4">Ação</th>
-                    <th className="py-3 px-4">Módulo</th>
+                    <th className="py-3 px-4">Módulo / Coleção</th>
                     <th className="py-3 px-4">Registro Afetado</th>
                     <th className="py-3 px-4">Detalhes da Operação</th>
                   </tr>
@@ -736,12 +891,13 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToTab }) => {
                       <td className="py-3 px-4 font-mono text-slate-500 whitespace-nowrap">
                         {log.data} <span className="text-slate-400">{log.horario}</span>
                       </td>
-                      <td className="py-3 px-4 font-semibold text-slate-900 whitespace-nowrap">
-                        {log.usuarioNome}
+                      <td className="py-3 px-4 whitespace-nowrap">
+                        <div className="font-semibold text-slate-900">{log.usuarioNome}</div>
+                        <span className="text-[10px] text-purple-700 font-mono">[{log.usuarioRole || 'admin'}]</span>
                       </td>
                       <td className="py-3 px-4 whitespace-nowrap">
                         <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
-                          log.acao.includes('EXCLU') ? 'bg-rose-100 text-rose-800' :
+                          log.acao.includes('deleteDoc') || log.acao.includes('EXCLU') ? 'bg-rose-100 text-rose-800' :
                           log.acao.includes('CRIAR') || log.acao.includes('CADASTRO') ? 'bg-emerald-100 text-emerald-800' :
                           log.acao.includes('EDITAR') || log.acao.includes('ATUALIZAR') ? 'bg-blue-100 text-blue-800' :
                           'bg-slate-100 text-slate-700'
@@ -750,7 +906,7 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToTab }) => {
                         </span>
                       </td>
                       <td className="py-3 px-4 font-medium text-slate-700 whitespace-nowrap">
-                        {log.moduloAfetado}
+                        {log.moduloAfetado || log.tipoEntidade}
                       </td>
                       <td className="py-3 px-4 font-medium text-indigo-900 whitespace-nowrap">
                         {log.registroAfetado}
@@ -776,12 +932,13 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToTab }) => {
               Políticas de Segurança do Firestore
             </h3>
             <p className="text-xs text-slate-600 leading-relaxed">
-              As regras de segurança estão ativas e sincronizadas no Firebase. O administrador possui permissão total de leitura e escrita através da verificação de e-mail e função.
+              O controle de acesso baseado em funções (RBAC) garante que somente administradores autenticados possam executar operações de exclusão (<code>deleteDoc</code>) e modificação em massa.
             </p>
             <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-xs font-mono space-y-1 text-slate-700">
-              <div>• Administrador Primário: <strong>paulocauan39@gmail.com</strong></div>
-              <div>• Coleções Protegidas: participants, usuarios, teams, games, tasks, ais, experiments, prompts, documents, audit_logs</div>
-              <div>• Validação de Deleção: Confirmação em UI + Registro em Audit Log</div>
+              <div>• Administrador: <strong>paulocauan39@gmail.com</strong></div>
+              <div>• Coleção de Auditoria: <strong>audit_logs</strong></div>
+              <div>• Coleção Principal de Usuários: <strong>usuarios</strong></div>
+              <div>• Padrão de Exclusão: <strong>Verificação de Admin + Modal de Confirmação + Log</strong></div>
             </div>
           </div>
 
@@ -810,7 +967,7 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToTab }) => {
           <div className="bg-white rounded-xl shadow-xl border border-slate-200 w-full max-w-md p-6 space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="text-base font-bold text-slate-900">
-                {editingUser ? 'Editar Perfil / Função do Usuário' : 'Novo Usuário do Sistema'}
+                {editingUser ? 'Editar Perfil / Função do Usuário' : 'Novo Usuário do Firestore'}
               </h3>
               <button
                 onClick={() => setUserModalOpen(false)}
@@ -906,7 +1063,7 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToTab }) => {
                   className="px-4 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-xs transition-colors flex items-center gap-1.5"
                 >
                   {isSavingUser && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
-                  {editingUser ? 'Salvar Alterações' : 'Cadastrar Usuário'}
+                  {editingUser ? 'Salvar Alterações' : 'Cadastrar no Firestore'}
                 </button>
               </div>
             </form>
@@ -914,27 +1071,37 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToTab }) => {
         </div>
       )}
 
-      {/* Modal Seguro de Exclusão de Usuário */}
+      {/* Confirmation Flow UI Modal for User Deletion */}
       {deleteUserModalOpen && userToDelete && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-xl border border-red-200 w-full max-w-md p-6 space-y-4">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
+          <div className="bg-white rounded-xl shadow-2xl border border-red-200 w-full max-w-md p-6 space-y-4">
             <div className="flex items-center gap-3 text-red-600">
-              <div className="p-2 bg-red-100 rounded-full">
-                <AlertTriangle className="w-6 h-6" />
+              <div className="p-2.5 bg-red-100 rounded-full">
+                <AlertTriangle className="w-6 h-6 text-red-600" />
               </div>
               <div>
-                <h3 className="text-base font-bold text-slate-900">Excluir Usuário Definitivamente</h3>
-                <p className="text-xs text-rose-700">Operação administrativa com registro de auditoria</p>
+                <h3 className="text-base font-bold text-slate-900">Confirmar Exclusão de Usuário</h3>
+                <p className="text-xs text-rose-700 font-medium">Operação deleteDoc com registro de auditoria</p>
               </div>
             </div>
 
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Você tem certeza de que deseja excluir permanentemente o participante <strong>"{userToDelete.nome}"</strong> ({userToDelete.email})?
-              Esta ação será auditada e não pode ser desfeita.
-            </p>
+            <div className="bg-red-50/70 border border-red-100 rounded-lg p-3.5 text-xs text-slate-700 space-y-2">
+              <p>
+                Você está prestes a excluir permanentemente o documento do usuário:
+              </p>
+              <div className="font-mono text-[11px] bg-white p-2.5 rounded border border-red-200 text-slate-800 space-y-1">
+                <div><strong>Nome:</strong> {userToDelete.nome}</div>
+                <div><strong>E-mail:</strong> {userToDelete.email}</div>
+                <div><strong>UID:</strong> {userToDelete.id}</div>
+                <div><strong>Função:</strong> {userToDelete.funcao}</div>
+              </div>
+              <p className="text-[11px] text-red-800 font-semibold">
+                ⚠️ Esta ação executará um <code>deleteDoc</code> no Firestore e registrará sua identidade em <code>audit_logs</code>. Esta operação não pode ser desfeita.
+              </p>
+            </div>
 
             {deleteError && (
-              <div className="p-2.5 bg-red-50 border border-red-200 rounded text-xs text-red-700">
+              <div className="p-2.5 bg-red-100 border border-red-300 rounded text-xs text-red-800">
                 {deleteError}
               </div>
             )}
@@ -955,10 +1122,10 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToTab }) => {
                 type="button"
                 disabled={isDeletingUser}
                 onClick={handleDeleteUser}
-                className="px-4 py-2 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg shadow-xs transition-colors flex items-center gap-1.5"
+                className="px-4 py-2 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg shadow-xs transition-colors flex items-center gap-1.5 disabled:opacity-50"
               >
                 {isDeletingUser && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
-                Confirmar Exclusão
+                Confirmar e Excluir Definitivamente
               </button>
             </div>
           </div>
@@ -969,7 +1136,6 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToTab }) => {
       <PromptCategoryManagerModal
         isOpen={categoryModalOpen}
         onClose={() => setCategoryModalOpen(false)}
-        onCategoriesChanged={loadAllData}
       />
     </div>
   );

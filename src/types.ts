@@ -306,6 +306,7 @@ export interface AuditLog {
     valorAnterior?: string;
     novoValor?: string;
     descricaoCurta?: string;
+    [key: string]: any;
   };
   data: string;
   horario: string;
